@@ -4,7 +4,6 @@ import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.{G4ToInternalRepresentationListener, MinizincModelListener, ParserUtil}
 import com.beepboop.parser.*
 import com.typesafe.scalalogging.*
-import deprecated.{MiniZincRunner, ModelUpdater}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 
