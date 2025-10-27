@@ -1,5 +1,32 @@
 *.class
 *.log
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+dist/*
+
+
+# Build
+target/
+gen/
+
+lib_managed/
+src_managed/
+
+# BSP Project
+project/boot/
+project/plugins/project/
+project/project/target
+project/project/target
+
+# IDE settings
+.idea/
+.bsp/
+
+config_local.json
+.history
+.cache
+.lib/
+
+models/models/
+models/
+*.iml
