@@ -194,6 +194,26 @@ object UnaryExpression {
   }
 }
 
+/*
+  Count ( expr: Expression[List[Any]] ) extends Expression [ReturnT]
+  - has expression -> should extend ComposableExpression
+    - children -> List(expr)
+    - withNewChildren -> how it should replace arguments to his children
+  - toString -> similiar to sumExpression |  count(listA)
+  - evalToString ->  count([2,3,4,5])
+  - eval(context)  expr(context).length
+  - signature - input list
+    outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+
+object CountExpression
+  def asCreatable(List(Expr // similiar to SumExpression
+
+  CountExpression[Integer](child) <- expr
+*/
+
+
+
+
 
 case class SumExpression[ReturnT : Numeric : ClassTag](
                 expr: Expression[List[ReturnT]],
