@@ -41,19 +41,6 @@ object DataProvider extends LogTrait {
     val parameterMap: Map[String, Any] = ParameterRegistry.dataPars.map(di => di.name -> di.value).toMap
     val tMap = solutionMap ++ parameterMap
     tMap
-//    var tMap = Map.empty[String, Any]
-//    debug(s"this.variables ${this.variables}")
-//    debug(s"this.parameters ${this.parameters}")
-//    this.variables.foreach(di => {
-//      val value = di.value.asInstanceOf[List[Any]].apply(solutionNumber)
-//      debug(s"VAR: ${di.name}: ${value}")
-//      tMap = tMap + (di.name -> value)
-//    })
-//    this.parameters.foreach(di => {
-//      debug(s"PAR: ${di.name}: ${di.value}")
-//      tMap = tMap + (di.name -> di.value)
-//    })
-//    tMap
   }
 
   def initalize(originalModelPath: String, dataPath: String, solutionsPath: String): Unit = {
@@ -101,7 +88,6 @@ object DataProvider extends LogTrait {
       if (paramValue != None) {
         return paramValue
       }
-      // If not found in parameters, check variables
       val varValue = VarRegistry.getValue(name)
       if (varValue != None) {
         if (this.variables.filter(_.name == name).head.detailedDataType.isArray) {
