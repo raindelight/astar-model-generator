@@ -6,6 +6,7 @@ import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.utils.Implicits.integerNumeric
 import java.lang.Integer.sum
 
+
 /* third party modules */
 import scala.reflect.{ClassTag, classTag}
 
@@ -362,6 +363,64 @@ object ForAllExpression {
   }
 }
 
+
+//Based on ForAllExpression
+case class ExistsExpression[IterT](
+                                    iteratorDef: IteratorDef[IterT],
+                                    body: Expression[Boolean]
+                                  ) extends Expression[Boolean] with ComposableExpression {
+
+
+  override def children: List[Expression[?]] = List(iteratorDef, body)
+
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "ExistsExpression requires two children.")
+    this.copy(
+      iteratorDef = newChildren(0).asInstanceOf[IteratorDef[IterT]],
+      body = newChildren(1).asInstanceOf[Expression[Boolean]]
+    )
+  }
+
+
+  override def toString: String = s"exists($iteratorDef)($body)"
+
+  override def evalToString: String = s"exists($iteratorDef)($body)"
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val (variableName, itemsToIterate) = iteratorDef.eval(context)
+
+    itemsToIterate.exists { item =>
+
+      body.eval(context)
+    }
+  }
+
+  override def signature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+}
+
+
+object ExistsExpression {
+  object ExistsIntListFactory extends Creatable {
+
+    override def templateSignature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "ExistsExpression.create requires two children.")
+
+      val collectionExpr = children(0).asInstanceOf[Expression[List[Integer]]]
+      val bodyExpr = children(1).asInstanceOf[Expression[Boolean]]
+
+      val iterator = IteratorDef("j", collectionExpr)
+
+      ExistsExpression(iterator, bodyExpr)
+    }
+  }
+}
+
+
+
 case class AllDifferentExpression(
                                    expr: Expression[List[?]]
                                  ) extends Expression[Boolean]
@@ -474,6 +533,663 @@ object LexicographicalExpression {
 
 
       LexicographicalExpression[Integer](left, operator, right)
+    }
+  }
+}
+
+
+case class MinimumExpression(
+                              elements: Expression[List[Integer]]
+                            ) extends Expression[Integer]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(elements)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "MinimumExpression requires one child.")
+    this.copy(elements = newChildren.head.asInstanceOf[Expression[List[Integer]]])
+  }
+  override def toString: String = s"min(${elements.toString})"
+
+  override def evalToString: String = s"min(${elements.evalToString})"
+
+  override def eval(context: Map[String, Any]): Integer = {
+
+    val evaluatedList: List[Integer] = elements.eval(context)
+
+    val minVal: Int = evaluatedList.map(_.intValue()).min
+    Integer.valueOf(minVal)
+  }
+  
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[Integer]].runtimeClass)
+    Signature(inputs = List(listInputType), output = IntType)
+  }
+}
+
+
+object MinimumExpression {
+  object ListMinimumFactory extends Creatable {
+    override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = IntType)
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "MinimumExpression.create requires one child.")
+
+      val child = children.head.asInstanceOf[Expression[List[?]]]
+      AllDifferentExpression(child)
+    }
+  }
+}
+
+case class MaximumExpression(
+                              elements: Expression[List[Integer]]
+                            ) extends Expression[Integer]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(elements)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "MaximumExpression requires one child.")
+    this.copy(elements = newChildren.head.asInstanceOf[Expression[List[Integer]]])
+  }
+
+  override def toString: String = s"max(${elements.toString})"
+
+  override def evalToString: String = s"max(${elements.evalToString})"
+
+  override def eval(context: Map[String, Any]): Integer = {
+
+    val evaluatedList: List[Integer] = elements.eval(context)
+
+    val maxVal: Int = evaluatedList.map(_.intValue()).max
+    Integer.valueOf(maxVal)
+  }
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[Integer]].runtimeClass)
+    Signature(inputs = List(listInputType), output = IntType)
+  }
+}
+
+object MaximumExpression {
+  object ListMaximumFactory extends Creatable {
+    override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = IntType)
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "MaximumExpression.create requires one child.")
+
+      val child = children.head.asInstanceOf[Expression[List[?]]]
+      AllDifferentExpression(child)
+    }
+  }
+}
+
+
+case class Task(
+                 start: Expression[Integer],
+                 duration: Expression[Integer],
+                 demand: Expression[Integer]
+               ) {
+
+  override def toString: String =
+    s"Task(${start.toString}, ${duration.toString}, ${demand.toString})"
+
+  def evalToString: String =
+    s"Task(${start.evalToString}, ${duration.evalToString}, ${demand.evalToString})"
+}
+
+
+case class CumulativeExpression(
+                                 tasks: Expression[List[Task]],
+                                 operator: BinaryOperator[Boolean],
+                                 limit: Expression[Integer]
+                               ) extends Expression[Boolean]
+  with OperatorContainer
+  with ComposableExpression {
+
+  override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
+    case op: BinaryOperator[Boolean] =>
+      this.copy(operator = newOp.asInstanceOf[BinaryOperator[Boolean]])
+    case _ =>
+      throw new IllegalArgumentException(s"Cannot replace operator in CumulativeExpression with non-binary operator ${newOp}")
+  }
+
+  override def children: List[Expression[?]] = List(tasks, limit)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "CumulativeExpression requires two children.")
+    this.copy(
+      tasks = newChildren(0).asInstanceOf[Expression[List[Task]]],
+      limit = newChildren(1).asInstanceOf[Expression[Integer]]
+    )
+  }
+
+  override def toString: String =
+    s"cumulative(${tasks.toString}, ${operator.toString}, ${limit.toString})"
+
+  override def evalToString: String =
+    s"cumulative(${tasks.evalToString}, ${operator.toString}, ${limit.evalToString})"
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val taskList = tasks.eval(context)
+    val cap = limit.eval(context).intValue()
+
+    val evaluatedTasks = taskList.map { task =>
+      (
+        task.start.eval(context).intValue(),
+        task.duration.eval(context).intValue(),
+        task.demand.eval(context).intValue()
+      )
+    }
+
+    if (evaluatedTasks.isEmpty) return true
+
+    val s = evaluatedTasks.map(_._1)
+
+    val minStart: Int = s.min
+    val maxEnd: Int = evaluatedTasks.map { case (start, duration, _) => start + duration }.max
+
+    (minStart to maxEnd).forall { time =>
+      val currentLoad = evaluatedTasks.filter { case (start, duration, _) =>
+        time >= start && time < start + duration
+      }.map { case (_, _, demand) => demand }.sum
+
+
+      operator.toString match {
+        case "<=" => currentLoad <= cap
+        case "<"  => currentLoad < cap
+        case "="  => currentLoad == cap
+        case ">=" => currentLoad >= cap
+        case ">"  => currentLoad > cap
+        case _    => throw new UnsupportedOperationException(s"Unsupported Cumulative operator: ${operator.toString}")
+      }
+    }
+  }
+
+
+  override def distance(context: Map[String, Any]): Int = {
+
+    val taskList = tasks.eval(context)
+    val cap = limit.eval(context).intValue()
+
+    val evaluatedTasks = taskList.map { task =>
+      (
+        task.start.eval(context).intValue(),
+        task.duration.eval(context).intValue(),
+        task.demand.eval(context).intValue()
+      )
+    }
+
+    if (evaluatedTasks.isEmpty) return 0
+
+    val s = evaluatedTasks.map(_._1)
+    val minStart: Int = s.min
+    val maxEnd: Int = evaluatedTasks.map { case (start, duration, _) => start + duration }.max
+
+
+    (minStart to maxEnd).map { time =>
+      val currentLoad = evaluatedTasks.filter { case (start, duration, _) =>
+        time >= start && time < start + duration
+      }.map { case (_, _, demand) => demand }.sum
+
+      Math.max(0, currentLoad - cap)
+    }.sum
+  }
+
+  override def signature: Signature = {
+
+    Signature(
+      inputs = List(ListTaskType, IntType),
+      output = BoolType
+    )
+  }
+}
+
+object CumulativeExpression {
+  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(ListTaskType, IntType),
+        output = BoolType
+      )
+
+    override def create(operator: BinaryOperator[Boolean], children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "CumulativeExpression.create requires two children (Task list, limit).")
+
+      val tasksExpr = children(0).asInstanceOf[Expression[List[Task]]]
+      val limitExpr = children(1).asInstanceOf[Expression[Integer]]
+
+
+      CumulativeExpression(tasksExpr, operator, limitExpr)
+    }
+  }
+}
+
+
+
+case class GlobalCardinalityExpression(
+                                        variablesExpr: Expression[List[Integer]],
+                                        expectedCountsExpr: Expression[Map[Integer, Integer]]
+                                      ) extends Expression[Boolean]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(variablesExpr, expectedCountsExpr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "GlobalCardinalityExpression requires two children.")
+    this.copy(
+      variablesExpr = newChildren(0).asInstanceOf[Expression[List[Integer]]],
+      expectedCountsExpr = newChildren(1).asInstanceOf[Expression[Map[Integer, Integer]]]
+    )
+  }
+
+  override def toString: String =
+    s"global_cardinality(${variablesExpr.toString}, ${expectedCountsExpr.toString})"
+
+  override def evalToString: String =
+    s"global_cardinality(${variablesExpr.evalToString}, ${expectedCountsExpr.evalToString})"
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val list = variablesExpr.eval(context)
+    val requiredCounts = expectedCountsExpr.eval(context)
+
+
+    val actualFrequencies: Map[Integer, Int] =
+      list.filter(requiredCounts.contains).groupBy(identity).view.mapValues(_.size).toMap
+
+
+    requiredCounts.forall { case (value, requiredCount) =>
+           val actualCount = actualFrequencies.getOrElse(value, 0)
+
+      actualCount == requiredCount.intValue()
+    }
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    val list = variablesExpr.eval(context)
+    val requiredCounts = expectedCountsExpr.eval(context)
+
+    val actualFrequencies: Map[Integer, Int] =
+      list.filter(requiredCounts.contains).groupBy(identity).view.mapValues(_.size).toMap
+
+    requiredCounts.map { case (value, requiredCount) =>
+      val actualCount = actualFrequencies.getOrElse(value, 0)
+
+      val reqCountInt = requiredCount.intValue()
+
+      Math.abs(actualCount - reqCountInt)
+    }.sum
+  }
+
+  override def signature: Signature = {
+
+    Signature(
+      inputs = List(ListIntType, MapIntToIntType),
+      output = BoolType
+    )
+  }
+}
+
+object GlobalCardinalityExpression {
+  object GlobalCardinalityFactory extends Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(ListAnyType, MapIntToIntType),
+        output = BoolType
+      )
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "GlobalCardinalityExpression.create requires two children.")
+
+      val listExpr = children(0).asInstanceOf[Expression[List[Integer]]]
+      val valuesExpr = children(1).asInstanceOf[Expression[Map[Integer, Integer]]]
+
+
+      GlobalCardinalityExpression(listExpr, valuesExpr)
+    }
+  }
+}
+
+
+case class RectDescriptor(
+                           x: Expression[Integer],
+                           y: Expression[Integer],
+                           width: Expression[Integer],
+                           height: Expression[Integer]
+                         ) {
+
+  override def toString: String =
+    s"RectDescriptor(${x.toString}, ${y.toString}, ${width.toString}, ${height.toString})"
+
+  def evalToString: String =
+    s"RectDescriptor(${x.evalToString}, ${y.evalToString}, ${width.evalToString}, ${height.evalToString})"
+}
+
+
+
+case class DiffnExpression(
+                            rectsExpr: Expression[List[RectDescriptor]] // Lista symbolicznych obiektów RectDescriptor
+                          ) extends Expression[Boolean]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(rectsExpr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "DiffnExpression requires one child.")
+    this.copy(rectsExpr = newChildren.head.asInstanceOf[Expression[List[RectDescriptor]]])
+  }
+
+  override def toString: String = s"diffn(${rectsExpr.toString})"
+
+  override def evalToString: String = s"diffn(${rectsExpr.evalToString})"
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val rects = rectsExpr.eval(context)
+
+
+    val evaluatedRects = rects.map { rect =>
+      (
+        rect.x.eval(context).intValue(),
+        rect.y.eval(context).intValue(),
+        rect.width.eval(context).intValue(),
+        rect.height.eval(context).intValue()
+      )
+    }
+
+
+    evaluatedRects.combinations(2).forall {
+      case List((x1, y1, dx1, dy1), (x2, y2, dx2, dy2)) =>
+
+        val noOverlapX = (x1 + dx1 <= x2) || (x2 + dx2 <= x1)
+
+        val noOverlapY = (y1 + dy1 <= y2) || (y2 + dy2 <= y1)
+
+        noOverlapX || noOverlapY
+    }
+  }
+
+
+  override def distance(context: Map[String, Any]): Int = {
+    val rects = rectsExpr.eval(context)
+    val evaluatedRects = rects.map { rect =>
+      (
+        rect.x.eval(context).intValue(),
+        rect.y.eval(context).intValue(),
+        rect.width.eval(context).intValue(),
+        rect.height.eval(context).intValue()
+      )
+    }
+
+    evaluatedRects.combinations(2).count {
+      case List((x1, y1, dx1, dy1), (x2, y2, dx2, dy2)) =>
+
+        val overlapX = (x1 < x2 + dx2) && (x2 < x1 + dx1)
+
+        val overlapY = (y1 < y2 + dy2) && (y2 < y1 + dy1)
+
+        overlapX && overlapY
+    }
+  }
+
+  override def signature: Signature = {
+    Signature(
+      inputs = List(ListRectType),
+      output = BoolType
+    )
+  }
+}
+
+
+object DiffnExpression {
+  object DiffnFactory extends Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(ListRectType),
+        output = BoolType
+      )
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "DiffnExpression.create requires one child.")
+
+      val rectsExpr = children.head.asInstanceOf[Expression[List[RectDescriptor]]]
+      DiffnExpression(rectsExpr)
+    }
+  }
+}
+
+
+
+case class ValuePrecedesChainExpression(
+                                         variablesExpr: Expression[List[Integer]],
+                                         valuesToPrecedeExpr: Expression[List[Integer]]
+                                       ) extends Expression[Boolean]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(variablesExpr, valuesToPrecedeExpr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "ValuePrecedesChainExpression requires two children.")
+    this.copy(
+      variablesExpr = newChildren(0).asInstanceOf[Expression[List[Integer]]],
+      valuesToPrecedeExpr = newChildren(1).asInstanceOf[Expression[List[Integer]]]
+    )
+  }
+
+  override def toString: String =
+    s"value_precede_chain(${variablesExpr.toString}, ${valuesToPrecedeExpr.toString})"
+
+  override def evalToString: String = {
+       val variablesStr = variablesExpr.evalToString
+    val valuesStr = valuesToPrecedeExpr.evalToString
+    s"value_precede_chain($variablesStr, $valuesStr)"
+  }
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val list = variablesExpr.eval(context)
+    val valuesToPrecede = valuesToPrecedeExpr.eval(context)
+
+    valuesToPrecede.sliding(2).forall {
+      case List(valA, valB) =>
+
+        val lastAIndexValue: Int = list.lastIndexWhere(_ == valA)
+        val lastAIndex: Option[Int] = lastAIndexValue match {
+          case -1 => None
+          case i => Some(i)
+        }
+
+        val firstBIndexValue: Int = list.indexOf(valB)
+        val firstBIndex: Option[Int] = firstBIndexValue match {
+          case -1 => None
+          case i => Some(i)
+        }
+
+        (lastAIndex, firstBIndex) match {
+          case (None, _) => true
+          case (_, None) => true
+          case (Some(lastA), Some(firstB)) =>
+
+            lastA < firstB
+        }
+      case _ => true
+    }
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    if (eval(context)) return 0
+    val list = variablesExpr.eval(context)
+    val valuesToPrecede = valuesToPrecedeExpr.eval(context)
+
+    valuesToPrecede.sliding(2).map {
+      case List(valA, valB) =>
+
+        val lastAIndexValue: Int = list.lastIndexWhere(_ == valA)
+        val lastAIndex: Option[Int] = lastAIndexValue match {
+          case -1 => None
+          case i => Some(i)
+        }
+
+        val firstBIndexValue: Int = list.indexOf(valB)
+        val firstBIndex: Option[Int] = firstBIndexValue match {
+          case -1 => None
+          case i => Some(i)
+        }
+
+        (lastAIndex, firstBIndex) match {
+          case (Some(lastA), Some(firstB)) =>
+            Math.max(0, lastA - firstB + 1)
+
+          case _ => 0
+        }
+      case _ => 0
+    }.sum
+  }
+
+  override def signature: Signature = {
+    Signature(
+      inputs = List(ListIntType, ListIntType),
+      output = BoolType
+    )
+  }
+}
+
+
+object ValuePrecedesChainExpression {
+
+  object ValuePrecedesChainFactory extends Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(ListIntType, ListIntType),
+        output = BoolType
+      )
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "ValuePrecedesChainExpression.create requires two child.")
+
+      val variablesExpr = children(0).asInstanceOf[Expression[List[Integer]]]
+      val valuesToPrecedeExpr = children(1).asInstanceOf[Expression[List[Integer]]] // Drugie dziecko
+
+      ValuePrecedesChainExpression(variablesExpr, valuesToPrecedeExpr)
+    }
+  }
+}
+
+
+case class RedundantConstraint[T](
+                                   innerConstraint: Expression[T]
+                                 ) extends Expression[T]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(innerConstraint)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "RedundantConstraint requires exactly one child.")
+    this.copy(innerConstraint = newChildren.head.asInstanceOf[Expression[T]])
+  }
+
+  override def toString: String =
+    s"redundant_constraint(${innerConstraint.toString})"
+
+  override def evalToString: String =
+    s"redundant_constraint(${innerConstraint.evalToString})"
+
+  override def eval(context: Map[String, Any]): T = {
+    innerConstraint.eval(context)
+  }
+
+
+  override def distance(context: Map[String, Any]): Int = {
+    innerConstraint.distance(context)
+  }
+
+  override def signature: Signature = {
+    Signature(
+      inputs = List(UnknownType),
+      output = BoolType
+    )
+  }
+}
+
+object RedundantConstraint {
+  object RedundantConstraintFactory extends Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(UnknownType),
+        output = BoolType
+      )
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "RedundantConstraintExpression.create requires one child.")
+
+      val innerConstraintExpr = children.head.asInstanceOf[Expression[Any]]
+
+      RedundantConstraint(innerConstraintExpr)
+    }
+  }
+}
+
+
+case class StrEqExpression(
+                            s1: Expression[String],
+                            s2: Expression[String]
+                          ) extends Expression[Boolean]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(s1, s2)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "StrEqExpression requires two children.")
+    this.copy(
+      s1 = newChildren(0).asInstanceOf[Expression[String]],
+      s2 = newChildren(1).asInstanceOf[Expression[String]]
+    )
+  }
+
+  override def toString: String =
+    s"str_eq(${s1.toString}, ${s2.toString})"
+
+  override def evalToString: String =
+    s"str_eq(${s1.evalToString}, ${s2.evalToString})"
+
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val val1 = s1.eval(context)
+    val val2 = s2.eval(context)
+
+    val1.equals(val2)
+  }
+
+
+  override def distance(context: Map[String, Any]): Int = {
+    if (eval(context)) 0 else 1
+  }
+
+  override def signature: Signature = {
+    Signature(
+      inputs = List(StringType, StringType),
+      output = BoolType
+    )
+  }
+}
+
+object StrEqExpression {
+  object StrEqFactory extends Creatable {
+    override def templateSignature: Signature =
+      Signature(
+        inputs = List(StringType, StringType),
+        output = BoolType
+      )
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "StrEqExpression.create requires two children.")
+
+      val s1Expr = children(0).asInstanceOf[Expression[String]]
+      val s2Expr = children(1).asInstanceOf[Expression[String]]
+
+      StrEqExpression(s1Expr, s2Expr)
     }
   }
 }
