@@ -40,7 +40,7 @@ object SolutionParser extends LogTrait {
   private def parseValue(value: String): Any = {
     if (value.startsWith("[") && value.endsWith("]")) {
       Try {
-        value.stripPrefix("[").stripSuffix("]").split(',').map(_.trim.toInt).toList
+        value.stripPrefix("[").stripSuffix("]").split(',').map(_.trim).filter(_.nonEmpty).map(_.toInt).toList
       }.getOrElse(value)
     }
     else if (value.matches("""^-?\d+\.\d+$""")) {

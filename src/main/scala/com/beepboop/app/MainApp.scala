@@ -35,6 +35,28 @@ object MainApp extends LogTrait {
     )
 
 
+    info("--- TEST: Sprawdzanie wartości po DataImporter ---")
+    
+    info("--- Parametry (z pliku .json): ---")
+    DataProvider.parameters.foreach { item =>
+      if (item.value != None) {
+        info(s"  -> ${item.name}: ${item.value} (Typ: ${item.value.getClass.getSimpleName})")
+      } else {
+        warn(s"  -> ${item.name}: BRAK WARTOŚCI")
+      }
+    }
+    
+    info("--- Zmienne (z pliku .csv): ---")
+    DataProvider.variables.foreach { item =>
+      if (item.value != None) {
+        info(s"  -> ${item.name}: ${item.value} (Typ: ${item.value.getClass.getSimpleName})")
+      } else {
+        warn(s"  -> ${item.name}: BRAK WARTOŚCI")
+      }
+    }
+    info("--- KONIEC TESTU ---")
+
+
 
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
