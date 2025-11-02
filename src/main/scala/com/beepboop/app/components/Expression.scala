@@ -260,6 +260,49 @@ object SumExpression {
   }
 }
 
+case class CountExpression[ReturnT : Numeric : ClassTag](
+                            expr: Expression[List[Any]]
+                          ) extends Expression[Integer]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(expr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "CountExpression requires one child.")
+    this.copy(expr = newChildren.head.asInstanceOf[Expression[List[?]]])
+  }
+
+  override def toString: String = s"count(${expr.toString})"
+
+  override def evalToString: String = s"count(${expr.evalToString})"
+
+  override def eval(context: Map[String, Any]): Integer = {
+    val listToCount = expr.eval(context)
+    listToCount.length
+  }
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[Any]].runtimeClass)
+    val singleOutputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+
+    Signature(inputs = List(listInputType), output = singleOutputType)
+  }
+}
+
+object CountExpression {
+  object IntListCountFactory extends Creatable {
+    override def templateSignature: Signature = {
+      Signature(inputs = List(ListIntType), output = IntType)
+    }
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "CountExpression.create requires one child (the list expression).")
+      val child = children.head.asInstanceOf[Expression[List[Any]]]
+      CountExpression(child)
+    }
+  }
+}
+
 /*
 case Forall(variableName, start, end, body)
 =>
@@ -315,6 +358,122 @@ object ForAllExpression {
       val iterator = IteratorDef("i", collectionExpr)
 
       ForAllExpression(iterator, bodyExpr)
+    }
+  }
+}
+
+case class AllDifferentExpression(
+                                   expr: Expression[List[?]]
+                                 ) extends Expression[Boolean]
+  with ComposableExpression {
+
+  override def children: List[Expression[?]] = List(expr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 1, "AllDifferentExpression requires one child.")
+    this.copy(expr = newChildren.head.asInstanceOf[Expression[List[?]]])
+  }
+
+  override def toString: String = s"alldifferent(${expr.toString})"
+
+  override def evalToString: String = s"alldifferent(${expr.evalToString})"
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val list = expr.eval(context)
+    list.nonEmpty && (list.size == list.toSet.size)
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    val list = expr.eval(context)
+    if (list.isEmpty) {
+      0
+    } else {
+      val counts = list.groupBy(identity).view.mapValues(_.size).toMap
+      counts.values.map(count => if (count > 1) count - 1 else 0).sum
+    }
+  }
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[?]].runtimeClass)
+    Signature(inputs = List(listInputType), output = BoolType)
+  }
+}
+
+object AllDifferentExpression {
+  object ListAllDifferentFactory extends Creatable {
+    override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = BoolType)
+
+    override def create(children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 1, "AllDifferentExpression.create requires one child.")
+
+      val child = children.head.asInstanceOf[Expression[List[?]]]
+      AllDifferentExpression(child)
+    }
+  }
+}
+
+case class LexicographicalExpression[T : Ordering : ClassTag](
+                                                               leftExpr: Expression[List[T]],
+                                                               operator: BinaryOperator[Boolean],
+                                                               rightExpr: Expression[List[T]]
+                                                             ) extends Expression[Boolean]
+  with OperatorContainer
+  with ComposableExpression {
+
+  override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
+    case op: BinaryOperator[Boolean] =>
+      this.copy(operator = newOp.asInstanceOf[BinaryOperator[Boolean]])
+    case _ =>
+      throw new IllegalArgumentException(s"Cannot replace operator in LexicographicalExpression with non-boolean binary operator ${newOp}")
+  }
+
+  override def children: List[Expression[?]] = List(leftExpr, rightExpr)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "LexicographicalExpression requires exactly two children for reconstruction")
+    this.copy(
+      leftExpr = newChildren(0).asInstanceOf[Expression[List[T]]],
+      rightExpr = newChildren(1).asInstanceOf[Expression[List[T]]]
+    )
+  }
+
+  override def toString: String = s"lex ${leftExpr.toString} ${operator.toString} ${rightExpr.toString}"
+  override def evaltoString: String = s"lex ${leftExpr.eval.toString} ${operator.toString} ${rightExpr.eval.toString}"
+
+  override def eval(context: Map[String, Any]): Boolean = {
+    val leftList = leftExpr.eval(context)
+    val rightList = rightExpr.eval(context)
+
+    implicit val ordering: Ordering[List[T]] = Ordering.Implicits.seqOrdering
+    val comparisonResult = ordering.compare(leftList, rightList)
+
+    operator.toString match {
+      case  "<=" => comparisonResult <= 0
+      case  "<"  => comparisonResult < 0
+      case  "="  => comparisonResult == 0
+      case  ">=" => comparisonResult >= 0
+      case  ">"  => comparisonResult > 0
+      case _ => throw new UnsupportedOperationException(s"Unsupported Lexicographical operator: ${operator.toString}")
+    }
+  }
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[T]].runtimeClass)
+    Signature(inputs = List(listInputType, listInputType), output = BoolType)
+  }
+}
+
+object LexicographicalExpression {
+  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable {
+    override def templateSignature: Signature = op.signature
+    override def create(operator: BinaryOperator[Boolean], children: List[Expression[?]]): Expression[?] = {
+      require(children.length == 2, "LexicographicalExpression.create requires two children.")
+
+      val left = children(0).asInstanceOf[Expression[List[Integer]]]
+      val right = children(1).asInstanceOf[Expression[List[Integer]]]
+
+
+      LexicographicalExpression[Integer](left, operator, right)
     }
   }
 }
