@@ -3,7 +3,6 @@ package com.beepboop.app.dataprovider
 
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
-// import scala.io.Source // <<< FIX: Removed duplicate import
 import scala.language.postfixOps
 import spray.json.*
 import DefaultJsonProtocol.*
@@ -52,17 +51,17 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
     } else {
       dataItems.filter(!_.isVar).foreach { item =>
         (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) if details != null => // <<< FIX: Added null check
+          case (Some(jsValue), details) if details != null =>
             try {
               val convertedValue: Any = (details.isArray, details.dataType) match {
                 case (true, "int") => jsValue.convertTo[List[Int]]
                 case (true, "float") => jsValue.convertTo[List[Double]]
                 case (true, "bool") => jsValue.convertTo[List[Boolean]]
-                case (true, "string") => jsValue.convertTo[List[String]] // <<< FIX: Added String List support
+                case (true, "string") => jsValue.convertTo[List[String]]
                 case (false, "int") => jsValue.convertTo[Int]
                 case (false, "float") => jsValue.convertTo[Double]
                 case (false, "bool") => jsValue.convertTo[Boolean]
-                case (false, "string") => jsValue.convertTo[String] // <<< FIX: Added String support
+                case (false, "string") => jsValue.convertTo[String]
                 case (_, unknownType) =>
                   warn(s"Unsupported data type: $unknownType for item ${item.name}") // todo: add deduction based on previously defined var
                   None
@@ -139,9 +138,6 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
           try {
             val columnValues = dataRows.map(_.split(";").apply(colIdx).trim)
 
-            // *** FIX START ***
-            // Added a check for `null` detailedDataType to prevent NullPointerException
-            // and fall back to auto-detection.
             val convertedValues: List[Any] = if (item.detailedDataType != null) {
               item.detailedDataType.dataType match {
                 case "int" =>
@@ -154,7 +150,7 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
                     case "false" | "0" | "no"  => false
                     case other => throw new IllegalArgumentException(s"Cannot convert '$other' to boolean")
                   }.toList
-                case "string" => // Explicitly handle string, though auto-detect would also work
+                case "string" =>
                   columnValues.toList
                 case otherType =>
                   warn(s"Unknown data type $otherType for item ${item.name}, attempting auto-detection")
@@ -164,7 +160,6 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
               warn(s"Missing detailedDataType for item ${item.name} in CSV, attempting auto-detection")
               tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
             }
-            // *** FIX END ***
 
             item.value = convertedValues
 
