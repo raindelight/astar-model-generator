@@ -34,8 +34,6 @@ object MainApp extends LogTrait {
       "models/accap_sols_a10.csv"
     )
 
-
-
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
 

@@ -3,7 +3,6 @@ package com.beepboop.app.dataprovider
 
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
-import scala.io.Source
 import scala.language.postfixOps
 import spray.json.*
 import DefaultJsonProtocol.*
@@ -15,17 +14,22 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
     if (parseVars) {
       dataItems.filter(_.isVar).foreach { item =>
         (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) =>
+          case (Some(jsValue), details) if details != null =>
             try {
               val convertedValue: Any = (details.isArray, details.dataType) match {
-                case (true, "int") => jsValue.convertTo[List[Int]]
-                case (true, "float") => jsValue.convertTo[List[Double]]
-                case (true, "bool") => jsValue.convertTo[List[Boolean]]
+                case (true, "int") =>
+                  Try(jsValue.convertTo[List[List[Int]]]).getOrElse(jsValue.convertTo[List[Int]])
+                case (true, "float") =>
+                  Try(jsValue.convertTo[List[List[Double]]]).getOrElse(jsValue.convertTo[List[Double]])
+                case (true, "bool") =>
+                  Try(jsValue.convertTo[List[List[Boolean]]]).getOrElse(jsValue.convertTo[List[Boolean]])
+                case (true, "string") => jsValue.convertTo[List[String]]
                 case (false, "int") => jsValue.convertTo[Int]
                 case (false, "float") => jsValue.convertTo[Double]
                 case (false, "bool") => jsValue.convertTo[Boolean]
+                case (false, "string") => jsValue.convertTo[String]
                 case (_, unknownType) =>
-                  warn(s"Unsupported data type: $unknownType for item ${item.name}") // todo: add deduction based on previously defined var
+                  warn(s"Unsupported data type: $unknownType for item ${item.name}")
                   None
               }
               item.value = convertedValue
@@ -47,15 +51,17 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
     } else {
       dataItems.filter(!_.isVar).foreach { item =>
         (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) =>
+          case (Some(jsValue), details) if details != null =>
             try {
               val convertedValue: Any = (details.isArray, details.dataType) match {
                 case (true, "int") => jsValue.convertTo[List[Int]]
                 case (true, "float") => jsValue.convertTo[List[Double]]
                 case (true, "bool") => jsValue.convertTo[List[Boolean]]
+                case (true, "string") => jsValue.convertTo[List[String]]
                 case (false, "int") => jsValue.convertTo[Int]
                 case (false, "float") => jsValue.convertTo[Double]
                 case (false, "bool") => jsValue.convertTo[Boolean]
+                case (false, "string") => jsValue.convertTo[String]
                 case (_, unknownType) =>
                   warn(s"Unsupported data type: $unknownType for item ${item.name}") // todo: add deduction based on previously defined var
                   None
@@ -132,20 +138,27 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
           try {
             val columnValues = dataRows.map(_.split(";").apply(colIdx).trim)
 
-            val convertedValues: List[Any] = item.detailedDataType.dataType match {
-              case "int" =>
-                columnValues.map(_.toInt).toList
-              case "float" =>
-                columnValues.map(_.toDouble).toList
-              case "bool" =>
-                columnValues.map {
-                  case "true" | "1" | "yes"  => true
-                  case "false" | "0" | "no"  => false
-                  case other => throw new IllegalArgumentException(s"Cannot convert '$other' to boolean")
-                }.toList
-              case otherType =>
-                warn(s"Unknown data type $otherType for item ${item.name}, attempting auto-detection")
-                tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+            val convertedValues: List[Any] = if (item.detailedDataType != null) {
+              item.detailedDataType.dataType match {
+                case "int" =>
+                  columnValues.map(_.toInt).toList
+                case "float" =>
+                  columnValues.map(_.toDouble).toList
+                case "bool" =>
+                  columnValues.map {
+                    case "true" | "1" | "yes"  => true
+                    case "false" | "0" | "no"  => false
+                    case other => throw new IllegalArgumentException(s"Cannot convert '$other' to boolean")
+                  }.toList
+                case "string" =>
+                  columnValues.toList
+                case otherType =>
+                  warn(s"Unknown data type $otherType for item ${item.name}, attempting auto-detection")
+                  tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+              }
+            } else {
+              warn(s"Missing detailedDataType for item ${item.name} in CSV, attempting auto-detection")
+              tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
             }
 
             item.value = convertedValues

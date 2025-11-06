@@ -37,18 +37,9 @@ object DataProvider extends LogTrait {
   def getSolutionNumber: Int = solutionNumber
 
   def createSolutionContext(solutionNumber: Int): Map[String, Any] =  {
-    var tMap = Map.empty[String, Any]
-    debug(s"this.variables ${this.variables}")
-    debug(s"this.parameters ${this.parameters}")
-    this.variables.foreach(di => {
-      val value = di.value.asInstanceOf[List[Any]].apply(solutionNumber)
-      debug(s"VAR: ${di.name}: ${value}")
-      tMap = tMap + (di.name -> value)
-    })
-    this.parameters.foreach(di => {
-      debug(s"PAR: ${di.name}: ${di.value}")
-      tMap = tMap + (di.name -> di.value)
-    })
+    val solutionMap: Map[String, Any] = VarRegistry.dataVars.apply(solutionNumber)
+    val parameterMap: Map[String, Any] = ParameterRegistry.dataPars.map(di => di.name -> di.value).toMap
+    val tMap = solutionMap ++ parameterMap
     tMap
   }
 
@@ -97,7 +88,6 @@ object DataProvider extends LogTrait {
       if (paramValue != None) {
         return paramValue
       }
-      // If not found in parameters, check variables
       val varValue = VarRegistry.getValue(name)
       if (varValue != None) {
         if (this.variables.filter(_.name == name).head.detailedDataType.isArray) {
@@ -115,15 +105,15 @@ object DataProvider extends LogTrait {
   object VarRegistry extends LogTrait {
     val dataVars = {
       info(s"Parsing known solutions from: $solutionsPath...")
-      DataImporter.importDataFile(solutionsPath.getOrElse(throw new IllegalStateException("DataProvider not initialized.")), variables, true)
-      info(s"From ${variables.size} dataItems")
-      info(s"  ->${variables.filter(_.isVar).size} vars")
-      info(s"  ->${variables.count(_.value != None)} have assigned value")
-
-      variables.filter(_.value != None).foreach { d =>
-        info(s"  | Name: ${d.name}, Value count: ${d.value.asInstanceOf[List[Any]].size}, Type: ${d.dataType}, Runtime: ${d.value.asInstanceOf[List[Any]].head.getClass.getSimpleName} First value: ${d.value.asInstanceOf[List[Any]].head}")
-      }
-      variables.filter(_.value != None)
+//      DataImporter.importDataFile(solutionsPath.getOrElse(throw new IllegalStateException("DataProvider not initialized.")), variables, true)
+//      info(s"From ${variables.size} dataItems")
+//      info(s"  ->${variables.filter(_.isVar).size} vars")
+//      info(s"  ->${variables.count(_.value != None)} have assigned value")
+//
+//      variables.filter(_.value != None).foreach { d =>
+//        info(s"  | Name: ${d.name}, Value count: ${d.value.asInstanceOf[List[Any]].size}, Type: ${d.dataType}, Runtime: ${d.value.asInstanceOf[List[Any]].head.getClass.getSimpleName} First value: ${d.value.asInstanceOf[List[Any]].head}")
+//      }
+//      variables.filter(_.value != None)
 
 
       val knownSolutions = SolutionParser.parse(solutionsPath.get, separator = ';')
