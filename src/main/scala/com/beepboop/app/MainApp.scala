@@ -20,8 +20,6 @@ import com.beepboop.app.logger.LogTrait
 object MainApp extends LogTrait {
 
   def main(args: Array[String]): Unit = {
-
-
     info("--- Step 1: Configuration ---")
     info("Loading hardcoded constraint grammar...")
     val internalGrammar: ParsedGrammar = GrammarConverter.parseConstraintGrammar()
