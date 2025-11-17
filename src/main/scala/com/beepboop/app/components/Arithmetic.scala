@@ -107,9 +107,29 @@ trait Negatable[T] {
 }
 
 object Negatable {
-  implicit object IntIsNegable extends Negatable[Int] {
-    override def negate(a: Int): Int = 0 - a
+  implicit object IntIsNegable extends Negatable[Integer] {
+    override def negate(a: Integer): Integer = 0 - a
     
+  }
+}
+
+trait Absolutable[T] {
+  def abs(a: T): T
+}
+
+object Absolutable {
+  implicit object IntIsAbsolutable extends Absolutable[Integer] {
+    override def abs(a: Integer): Integer = java.lang.Math.abs(a)
+  }
+}
+
+trait BoolToIntConvertible[T, R] {
+  def convert(a: T): R
+}
+
+object BoolToIntConvertible {
+  implicit object BoolIsConvertible extends BoolToIntConvertible[Boolean, Integer] {
+    override def convert(a: Boolean): Integer = if (a) 1 else 0
   }
 }
 

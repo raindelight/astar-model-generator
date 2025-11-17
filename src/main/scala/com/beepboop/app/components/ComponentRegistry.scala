@@ -73,7 +73,10 @@ object ComponentRegistry {
   )
 
   private val unaryOperators: List[UnaryOperator[?]] = List(
-    new NotOperator[Boolean]()
+    new NotOperator[Boolean](),
+    new NegateOperator[Integer](),
+    new AbsOperator[Integer](),
+    new BoolToIntOperator[Boolean, Integer]()
     // todo: add another unary operator
   )
 
