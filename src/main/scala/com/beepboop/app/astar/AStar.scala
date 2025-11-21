@@ -99,22 +99,48 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(visited)
   }
 
-
-
   private def calculateHeuristic(constraint: Expression[?]): Int = {
-    var maxDist = -1
-    var maxSatisfied: Int = 0
-    (0 until numSolutions).map { solutionIndex => {
-        val context = DataProvider.createSolutionContext(solutionIndex)
-        maxDist = constraint.distance(context).asInstanceOf[Int].max(maxDist)
-        maxSatisfied = maxSatisfied + (if constraint.eval(context).asInstanceOf[Boolean] then 1 else 0)
-        0
+    if (numSolutions == 0) return Int.MaxValue
+
+    var satisfiedCount = 0
+    var totalNormalizedDistance: Double = 0.0
+    val beta = 2.0
+    val betaSq = beta * beta
+
+    val SCALING_FACTOR = 1000
+
+    var i = 0
+    while (i < numSolutions) {
+      try {
+        val context = DataProvider.createSolutionContext(i)
+        val rawDist = constraint.distance(context).asInstanceOf[Int]
+
+        if (rawDist == 0) {
+          satisfiedCount += 1
+        } else {
+          totalNormalizedDistance += rawDist.toDouble / (1.0 + rawDist.toDouble)
+        }
+      } catch {
+        case NonFatal(e) =>
+          totalNormalizedDistance += 1.0
       }
+      i += 1
     }
 
-    debug(s"For constraint ${constraint.toString}: maxDist: ${maxDist}, maxSatisfied: ${maxSatisfied}")
+    val satisfactionRate = satisfiedCount.toDouble / numSolutions.toDouble
+    val avgNormDist = totalNormalizedDistance / numSolutions.toDouble
+    val closenessRate = 1.0 - avgNormDist
 
-    maxDist + (1 - (maxSatisfied / DataProvider.solutionCount))
+    if (satisfactionRate == 0.0 && closenessRate == 0.0) {
+      return SCALING_FACTOR
+    }
+
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val denominator = (betaSq * satisfactionRate) + closenessRate
+    val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
+    val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
+
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
   }
 
 
