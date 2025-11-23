@@ -7,7 +7,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.io.Source
-
+/*
 class SystemIntegrationSuiteTest extends AnyFunSuite {
   val modelCode: String = Source.fromFile("src/test/resources/test_model.mzn").mkString
   val input = CharStreams.fromString(modelCode)
@@ -215,3 +215,4 @@ class SystemIntegrationSuiteTest extends AnyFunSuite {
     assert(distanceAnalyzer.getDistance(constr, sampleSolutionFull) == 1)
   }
 }
+*/

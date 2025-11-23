@@ -33,7 +33,7 @@ com.beepboop.app.mutations.ReplaceOperator:
 
 com.beepboop.app.mutations.ExpressionGenerator:
   level: WARN
-  enabled: true
+  enabled: false
 
 
 com.beepboop.app.mutations.ReplaceSubtree:

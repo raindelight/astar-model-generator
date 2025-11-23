@@ -5,8 +5,8 @@ package com.beepboop.app.components
 
 /* own modules */
 import com.beepboop.app.components.Operator
+import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
-
 import com.beepboop.app.dataprovider.DataProvider
 
 sealed trait ExpressionType
@@ -93,7 +93,10 @@ object ComponentRegistry {
   )
 
   private val unaryOperators: List[UnaryOperator[?]] = List(
-    new NotOperator[Boolean]()
+    new NotOperator[Boolean](),
+    new NegateOperator[Integer](),
+    new AbsOperator[Integer](),
+    new BoolToIntOperator[Boolean, Integer]()
     // todo: add another unary operator
   )
 
@@ -107,7 +110,10 @@ object ComponentRegistry {
   )
 
   private val expressionFactories: List[Creatable] = List(
-    //SumExpression.IntListSumFactory
+    SumExpression.IntListSumFactory,
+    ForAllExpression.ForAllIntListFactory,
+    CountExpression.IntListCountFactory,
+    AllDifferentExpression.ListAllDifferentFactory
   )
 
   val creatables: List[Creatable] =

@@ -11,7 +11,7 @@ object AllMutations {
     TransformConstantToVariable,
     ChangeVariable,
     ReplaceSubtree(1),
-    ReplaceSubtree(2)
+    ReplaceSubtree(2),
   )
 
   val directory: Map[String, Mutation] = mutations.map(m => m.name -> m).toMap

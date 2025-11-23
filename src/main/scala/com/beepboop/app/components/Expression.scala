@@ -1,9 +1,10 @@
 package com.beepboop.app.components
 
 import com.beepboop.app.components.*
-import com.beepboop.app.dataprovider.DataProvider
+import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.utils.Implicits.integerNumeric
+
 import java.lang.Integer.sum
 
 
@@ -127,7 +128,17 @@ case class BinaryExpression[ReturnT](
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
     require(newChildren.length == 2, "BinaryExpression requires exactly two children for reconstruction")
-    this.copy(left = newChildren(0), right = newChildren(1))
+
+    require(
+      newChildren.head.signature.output == operator.signature.inputs.head,
+      s"Left child output data type doesn't match required operator signature input, ${newChildren.head.signature.output} != ${operator.signature.inputs.head} for ${this.operator.toString} (withNewChildren)"
+    )
+
+    require(
+      newChildren(1).signature.output == operator.signature.inputs(1),
+      s"Right child output data type doesn't match required operator signature input, ${newChildren(1).signature.output} != ${operator.signature.inputs(1)} for ${this.operator.toString} (withNewChildren)"
+    )
+    this.copy(left = newChildren.head, right = newChildren(1))
   }
 
   override def toString: String = stringWithSpaces("(", left.toString, operator.toString, right.toString, ")")
@@ -147,10 +158,20 @@ case class BinaryExpression[ReturnT](
 }
 
 object BinaryExpression {
-  def asCreatable(op: BinaryOperator[?]): Creatable = new Creatable {
+  def asCreatable[T](op: BinaryOperator[T]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
-    override def create(children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 2)
+
+
+      require(
+        children(0).signature.output == op.signature.inputs(0),
+        s"Left child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}"
+      )
+      require(
+        children(1).signature.output == op.signature.inputs(1),
+        s"Right child output data type doesn't match required operator signature input, ${children(1).signature.output} != ${op.signature.inputs(1)} for ${op.toString}"
+      )
       BinaryExpression(children(0), op, children(1))
     }
   }
@@ -178,7 +199,7 @@ case class UnaryExpression[ReturnT](
     this.copy(expr = newChildren(0))
   }
 
-  override def toString: String =  operator.toString + expr.toString
+  override def toString: String =  operator.toString + "(" + expr.toString + ")"
   override def evalToString: String = operator.toString + expr.evalToString
 
   override def signature: Signature = operator.signature
@@ -186,10 +207,11 @@ case class UnaryExpression[ReturnT](
 }
 
 object UnaryExpression {
-  def asCreatable(op: UnaryOperator[?]): Creatable = new Creatable {
+  def asCreatable[T](op: UnaryOperator[T]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
-    override def create(children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 1)
+      require(children(0).signature.output == op.signature.inputs(0), s"Child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}")
       UnaryExpression(children(0), op)
     }
   }
@@ -233,7 +255,6 @@ case class SumExpression[ReturnT : Numeric : ClassTag](
 
   override def eval(context: Map[String, Any]): ReturnT = {
     val numeric = implicitly[Numeric[ReturnT]]
-    debug(s"Expr: ${expr.toString}, ${expr.eval(context)}")
     var listToSum = expr.eval(context)
     listToSum.foldLeft(numeric.zero) { (accumulator, element) =>
       numeric.plus(accumulator, element)
@@ -333,10 +354,8 @@ case class ForAllExpression[IterT](
 
   override def eval(context: Map[String, Any]): Boolean = {
     val (variableName, itemsToIterate) = iteratorDef.eval(context)
-    /* todo: ask DataProvider for random name for new variable, and push it's value to DataProvider */
-    /* todo: maybe context should be optional parameter? */
     itemsToIterate.forall { item =>
-      body.eval(context)
+      body.eval(context.+(variableName -> item))
     }
   }
 
@@ -355,8 +374,7 @@ object ForAllExpression {
       val collectionExpr = children(0).asInstanceOf[Expression[List[Integer]]]
       val bodyExpr = children(1).asInstanceOf[Expression[Boolean]]
 
-      /* todo: ask DataProvider for random name for new variable, add it to context */
-      val iterator = IteratorDef("i", collectionExpr)
+      val iterator = IteratorDef(VarNameGenerator.generateUniqueName(), collectionExpr)
 
       ForAllExpression(iterator, bodyExpr)
     }
@@ -400,7 +418,7 @@ case class ExistsExpression[IterT](
   override def signature: Signature = Signature(inputs = List(ListAnyType, BoolType), output = BoolType)
 }
 
-
+/* todo: based on forall add adding to context and globally unique name */
 object ExistsExpression {
   object ExistsIntListFactory extends Creatable {
 
@@ -470,7 +488,7 @@ object AllDifferentExpression {
     }
   }
 }
-
+/* todo: check this code
 case class LexicographicalExpression[T : Ordering : ClassTag](
                                                                leftExpr: Expression[List[T]],
                                                                operator: BinaryOperator[Boolean],
@@ -557,7 +575,7 @@ object LexicographicalExpression {
     }
   }
 }
-
+*/
 
 case class MinimumExpression[ReturnT : Numeric : ClassTag](
                               elements: Expression[List[ReturnT]]
@@ -661,7 +679,7 @@ case class Task(
     s"Task(${start.evalToString}, ${duration.evalToString}, ${demand.evalToString})"
 }
 
-
+/* todo: check this code
 case class CumulativeExpression(
                                  tasks: Expression[List[Task]],
                                  operator: BinaryOperator[Boolean],
@@ -782,6 +800,7 @@ object CumulativeExpression {
   }
 }
 
+*/
 
 
 case class GlobalCardinalityExpression(

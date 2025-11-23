@@ -3,6 +3,7 @@ package com.beepboop.app
 import com.beepboop.app.astar.AStar
 import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, Variable}
 import com.beepboop.app.dataprovider.DataProvider
+import com.beepboop.app.logger.Profiler
 import com.beepboop.app.mutations.{AllMutations, ExpressionGenerator, MutationEngine}
 import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser, NewMinizincParserBaseListener}
 import com.typesafe.scalalogging.*
@@ -20,8 +21,6 @@ import com.beepboop.app.logger.LogTrait
 object MainApp extends LogTrait {
 
   def main(args: Array[String]): Unit = {
-
-
     info("--- Step 1: Configuration ---")
     info("Loading hardcoded constraint grammar...")
     val internalGrammar: ParsedGrammar = GrammarConverter.parseConstraintGrammar()
@@ -34,8 +33,6 @@ object MainApp extends LogTrait {
       "models/accap_sols_a10.csv"
     )
 
-
-
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
 
@@ -45,6 +42,9 @@ object MainApp extends LogTrait {
     t.foreach(c => {
       info(c.toString)
     })
+
+    Profiler.report()
+    Profiler.reset()
     /*
     var mutatedExpression = initialExpression
 

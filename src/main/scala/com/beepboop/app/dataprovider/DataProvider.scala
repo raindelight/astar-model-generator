@@ -33,23 +33,20 @@ object DataProvider extends LogTrait {
   var variables: List[DataItem] = Nil
   var tmpVars: List[DataItem] = List()
   private var variableCreatables: Option[List[Creatable]] = None
+  var solutionContexts: Vector[Map[String, Any]] = Vector();
+
 
   def getSolutionNumber: Int = solutionNumber
 
   def createSolutionContext(solutionNumber: Int): Map[String, Any] =  {
-    var tMap = Map.empty[String, Any]
-    debug(s"this.variables ${this.variables}")
-    debug(s"this.parameters ${this.parameters}")
-    this.variables.foreach(di => {
-      val value = di.value.asInstanceOf[List[Any]].apply(solutionNumber)
-      debug(s"VAR: ${di.name}: ${value}")
-      tMap = tMap + (di.name -> value)
-    })
-    this.parameters.foreach(di => {
-      debug(s"PAR: ${di.name}: ${di.value}")
-      tMap = tMap + (di.name -> di.value)
-    })
+    val solutionMap: Map[String, Any] = VarRegistry.dataVars(solutionNumber)
+    val parameterMap: Map[String, Any] = ParameterRegistry.dataPars.map(di => di.name -> di.value).toMap
+    val tMap = solutionMap ++ parameterMap
     tMap
+  }
+
+  def getSolutionContext(solutionNumber: Int): Map[String, Any] = {
+    solutionContexts.apply(solutionNumber)
   }
 
   def initalize(originalModelPath: String, dataPath: String, solutionsPath: String): Unit = {
@@ -80,6 +77,9 @@ object DataProvider extends LogTrait {
     }
 
 
+
+
+
     groupedVars.foreach { case (exprType, dataItems) =>
       debug(s"  -> Type: $exprType, Items: ${dataItems.map(_.name).mkString(", ")}")
     }
@@ -90,6 +90,8 @@ object DataProvider extends LogTrait {
         new RandomVariableFactory(exprType, dataItems.map(_.name))
       }.toList
     )
+
+    this.solutionContexts = (0 until solutionCount).map(createSolutionContext).toVector
   }
 
   def getValue(name: String): Any = {
@@ -97,7 +99,6 @@ object DataProvider extends LogTrait {
       if (paramValue != None) {
         return paramValue
       }
-      // If not found in parameters, check variables
       val varValue = VarRegistry.getValue(name)
       if (varValue != None) {
         if (this.variables.filter(_.name == name).head.detailedDataType.isArray) {
@@ -115,15 +116,15 @@ object DataProvider extends LogTrait {
   object VarRegistry extends LogTrait {
     val dataVars = {
       info(s"Parsing known solutions from: $solutionsPath...")
-      DataImporter.importDataFile(solutionsPath.getOrElse(throw new IllegalStateException("DataProvider not initialized.")), variables, true)
-      info(s"From ${variables.size} dataItems")
-      info(s"  ->${variables.filter(_.isVar).size} vars")
-      info(s"  ->${variables.count(_.value != None)} have assigned value")
-
-      variables.filter(_.value != None).foreach { d =>
-        info(s"  | Name: ${d.name}, Value count: ${d.value.asInstanceOf[List[Any]].size}, Type: ${d.dataType}, Runtime: ${d.value.asInstanceOf[List[Any]].head.getClass.getSimpleName} First value: ${d.value.asInstanceOf[List[Any]].head}")
-      }
-      variables.filter(_.value != None)
+//      DataImporter.importDataFile(solutionsPath.getOrElse(throw new IllegalStateException("DataProvider not initialized.")), variables, true)
+//      info(s"From ${variables.size} dataItems")
+//      info(s"  ->${variables.filter(_.isVar).size} vars")
+//      info(s"  ->${variables.count(_.value != None)} have assigned value")
+//
+//      variables.filter(_.value != None).foreach { d =>
+//        info(s"  | Name: ${d.name}, Value count: ${d.value.asInstanceOf[List[Any]].size}, Type: ${d.dataType}, Runtime: ${d.value.asInstanceOf[List[Any]].head.getClass.getSimpleName} First value: ${d.value.asInstanceOf[List[Any]].head}")
+//      }
+//      variables.filter(_.value != None)
 
 
       val knownSolutions = SolutionParser.parse(solutionsPath.get, separator = ';')
@@ -158,7 +159,7 @@ object DataProvider extends LogTrait {
       if (knownSolutions.isEmpty) {
         throw new IllegalStateException("No solutions found in output file. Aborting.")
       }
-      knownSolutions
+      knownSolutions.toVector
 
     }
     def load(): Unit = { return }
@@ -282,4 +283,14 @@ object ModelParser extends LogTrait {
   }
 
 
+}
+
+object VarNameGenerator {
+  private var counter: Int = 0
+
+  def generateUniqueName(prefix: String = "tmp_var"): String = synchronized {
+    val newName = s"${prefix}_${counter}"
+    counter += 1
+    newName
+  }
 }

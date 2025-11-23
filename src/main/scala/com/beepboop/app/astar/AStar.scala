@@ -4,10 +4,12 @@ import com.beepboop.app.*
 import com.beepboop.app.components.{BinaryExpression, Expression}
 import com.beepboop.app.dataprovider.{DataItem, DataProvider}
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.logger.Profiler
 import com.beepboop.app.mutations.{AllMutations, MutationEngine}
 import com.beepboop.parser.{ModelConstraintGrammarLexer, ModelConstraintGrammarParser}
 import com.typesafe.scalalogging.LazyLogging
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 
 import scala.collection.mutable
 import scala.util.Random
@@ -74,7 +76,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     openSet.enqueue(startNode)
 
     var iterations = 0
-    val maxIterations = 5000
+    val maxIterations = 500
 
     while (openSet.nonEmpty && iterations < maxIterations) {
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
@@ -99,22 +101,46 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(visited)
   }
 
-
-
   private def calculateHeuristic(constraint: Expression[?]): Int = {
-    var maxDist = -1
-    var maxSatisfied: Int = 0
-    (0 until numSolutions).map { solutionIndex => {
-        val context = DataProvider.createSolutionContext(solutionIndex)
-        maxDist = constraint.distance(context).asInstanceOf[Int].max(maxDist)
-        maxSatisfied = maxSatisfied + (if constraint.eval(context).asInstanceOf[Boolean] then 1 else 0)
-        0
+
+    Profiler.profile("calculateHeuristic") {
+      if (numSolutions == 0) return Int.MaxValue
+
+    val beta = 2.0
+    val betaSq = beta * beta
+
+    val SCALING_FACTOR = 1000
+
+    var i = 0
+    val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
+      try {
+        val context = DataProvider.createSolutionContext(i)
+        val rawDist = constraint.distance(context)
+
+        if (rawDist == 0) (1, 0.0) 
+        else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+      } catch {
+        case scala.util.control.NonFatal(e) => (0, 1.0) 
       }
+    }.fold((0, 0.0)) { (acc, elem) =>
+      (acc._1 + elem._1, acc._2 + elem._2)
     }
 
-    debug(s"For constraint ${constraint.toString}: maxDist: ${maxDist}, maxSatisfied: ${maxSatisfied}")
+      val satisfactionRate = satisfiedCount.toDouble / numSolutions.toDouble
+      val avgNormDist = totalNormalizedDistance / numSolutions.toDouble
+      val closenessRate = 1.0 - avgNormDist
 
-    maxDist + (1 - (maxSatisfied / DataProvider.solutionCount))
+      if (satisfactionRate == 0.0 && closenessRate == 0.0) {
+        return SCALING_FACTOR
+      }
+
+      val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+      //val denominator = (betaSq * satisfactionRate) + closenessRate
+      val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
+      val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
+
+      ((1.0 - fScore) * SCALING_FACTOR).toInt
+    }
   }
 
 
@@ -130,7 +156,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
 
     constraints.map(c =>
       val totalDistance = (0 until numSolutions).map { solutionIndex =>  {
-          val context = DataProvider.createSolutionContext(solutionIndex)
+          val context = DataProvider.getSolutionContext(solutionIndex)
           constraints.map(c => c.distance(context)).sum
         }
       }.min
@@ -145,7 +171,14 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
 
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
     debug(possibleMutations.toString)
-    val neighbors = possibleMutations.map((e, m) => mutationEngine.replaceNodeInTree(constraint, e, m(e).getOrElse(constraint)))
+    val neighbors = possibleMutations.flatMap {
+      case (targetNode, mutationFunc) =>
+        val maybeReplacement = mutationFunc(targetNode)
+
+        maybeReplacement.map { replacement =>
+          mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
+        }
+    }
     debug(neighbors.toString)
     neighbors.toSet.toList
   }

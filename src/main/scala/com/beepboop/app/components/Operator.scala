@@ -7,7 +7,7 @@ import scala.reflect.{ClassTag, classTag}
 
 /* own modules */
 import com.beepboop.app.components.{Addable, Andable, Contains, Divisible, Equatable, GreaterEqual, GreaterThan, Implies, LessEqual, LessThan, Modulable, Multiplicable, NotEquatable, Orable, Signature, Subtractable, Xorable}
-import com.beepboop.app.components.{Addable, Signature, NotEquatable, Equatable, LessThan, GreaterThan, LessEqual, GreaterEqual, Negatable}
+import com.beepboop.app.components.{Addable, Signature, NotEquatable, Equatable, LessThan, GreaterThan, LessEqual, GreaterEqual, Negatable, Absolutable, BoolToIntConvertible}
 import com.beepboop.app.components.{Addable, Signature, NotEquatable, Equatable, NotComputable}
 import com.beepboop.app.logger.LogTrait
 
@@ -329,5 +329,26 @@ class NegateOperator[T: ClassTag](implicit strategy: Negatable[T]) extends Unary
 
   override def signature: Signature = Signature(
     List(scalaTypeToExprType(classTag[T].runtimeClass)), scalaTypeToExprType(classTag[T].runtimeClass)
+  )
+}
+
+class AbsOperator[T: ClassTag](implicit strategy: Absolutable[T]) extends UnaryOperator[T] {
+  override def eval(expr: Any): T =  strategy.abs(expr.asInstanceOf[T])
+
+  override def toString: String = "abs"
+
+  override def signature: Signature = Signature(
+    List(scalaTypeToExprType(classTag[T].runtimeClass)), scalaTypeToExprType(classTag[T].runtimeClass)
+  )
+}
+
+class BoolToIntOperator[T: ClassTag, R: ClassTag](implicit strategy: BoolToIntConvertible[T, R]) extends UnaryOperator[R] {
+  override def eval(expr: Any): R = strategy.convert(expr.asInstanceOf[T])
+
+  override def toString: String = "bool2int"
+
+  override def signature: Signature = Signature(
+    List(scalaTypeToExprType(classTag[T].runtimeClass)),
+    scalaTypeToExprType(classTag[R].runtimeClass)
   )
 }
