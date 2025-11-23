@@ -397,14 +397,14 @@ case class ExistsExpression[IterT](
     }
   }
 
-  override def signature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+  override def signature: Signature = Signature(inputs = List(ListAnyType, BoolType), output = BoolType)
 }
 
 
 object ExistsExpression {
   object ExistsIntListFactory extends Creatable {
 
-    override def templateSignature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+    override def templateSignature: Signature = Signature(inputs = List(ListAnyType, BoolType), output = BoolType)
 
     override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 2, "ExistsExpression.create requires two children.")
@@ -496,8 +496,35 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
     )
   }
 
-  override def toString: String = s"lex ${leftExpr.toString} ${operator.toString} ${rightExpr.toString}"
-  override def evaltoString: String = s"lex ${leftExpr.eval.toString} ${operator.toString} ${rightExpr.eval.toString}"
+ 
+  override def toString: String = {
+    val leftStr = leftExpr.toString
+    val rightStr = rightExpr.toString
+    
+    operator.toString match {
+      case "<" => s"lex_less($leftStr, $rightStr)"
+      case "<=" => s"lex_leq($leftStr, $rightStr)"
+      case ">" => s"lex_greater($leftStr, $rightStr)" 
+      case ">=" => s"lex_greatereq($leftStr, $rightStr)"
+      case "="  => s"$leftStr = $rightStr"
+      case _ => throw new UnsupportedOperationException(s"Unsupported Lexicographical operator for export: ${operator.toString}")
+    }
+  }
+
+
+  override def evalToString: String = {
+    val leftStr = leftExpr.evalToString
+    val rightStr = rightExpr.evalToString
+
+    operator.toString match {
+      case "<" => s"lex_less($leftStr, $rightStr)"
+      case "<=" => s"lex_leq($leftStr, $rightStr)"
+      case ">" => s"lex_greater($leftStr, $rightStr)"
+      case ">=" => s"lex_greatereq($leftStr, $rightStr)"
+      case "="  => s"$leftStr = $rightStr"
+      case _ => throw new UnsupportedOperationException(s"Unsupported Lexicographical operator: ${operator.toString}")
+    }
+  }
 
   override def eval(context: Map[String, Any]): Boolean = {
     val leftList = leftExpr.eval(context)
@@ -506,14 +533,8 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
     implicit val ordering: Ordering[List[T]] = Ordering.Implicits.seqOrdering
     val comparisonResult = ordering.compare(leftList, rightList)
 
-    operator.toString match {
-      case  "<=" => comparisonResult <= 0
-      case  "<"  => comparisonResult < 0
-      case  "="  => comparisonResult == 0
-      case  ">=" => comparisonResult >= 0
-      case  ">"  => comparisonResult > 0
-      case _ => throw new UnsupportedOperationException(s"Unsupported Lexicographical operator: ${operator.toString}")
-    }
+
+    operator.eval(comparisonResult, 0)
   }
 
   override def signature: Signature = {
@@ -538,32 +559,33 @@ object LexicographicalExpression {
 }
 
 
-case class MinimumExpression(
-                              elements: Expression[List[Integer]]
-                            ) extends Expression[Integer]
+case class MinimumExpression[ReturnT : Numeric : ClassTag](
+                              elements: Expression[List[ReturnT]]
+                            ) extends Expression[ReturnT]
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(elements)
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
     require(newChildren.length == 1, "MinimumExpression requires one child.")
-    this.copy(elements = newChildren.head.asInstanceOf[Expression[List[Integer]]])
+    this.copy(elements = newChildren.head.asInstanceOf[Expression[List[ReturnT]]])
   }
   override def toString: String = s"min(${elements.toString})"
 
   override def evalToString: String = s"min(${elements.evalToString})"
 
-  override def eval(context: Map[String, Any]): Integer = {
+  override def eval(context: Map[String, Any]): ReturnT = {
 
-    val evaluatedList: List[Integer] = elements.eval(context)
+    val evaluatedList: List[ReturnT] = elements.eval(context)
 
-    val minVal: Int = evaluatedList.map(_.intValue()).min
-    Integer.valueOf(minVal)
+    val numeric = implicitly[Numeric[ReturnT]]
+    evaluatedList.min(numeric)
   }
   
   override def signature: Signature = {
-    val listInputType = scalaTypeToExprType(classTag[List[Integer]].runtimeClass)
-    Signature(inputs = List(listInputType), output = IntType)
+    val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
+    val outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    Signature(inputs = List(listInputType), output = outputType)
   }
 }
 
@@ -575,15 +597,15 @@ object MinimumExpression {
     override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 1, "MinimumExpression.create requires one child.")
 
-      val child = children.head.asInstanceOf[Expression[List[?]]]
-      AllDifferentExpression(child)
+      val child = children.head.asInstanceOf[Expression[List[Integer]]]
+      MinimumExpression[Integer](child)
     }
   }
 }
 
-case class MaximumExpression(
-                              elements: Expression[List[Integer]]
-                            ) extends Expression[Integer]
+case class MaximumExpression[ReturnT : Numeric : ClassTag](
+                              elements: Expression[List[ReturnT]]
+                            ) extends Expression[ReturnT]
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(elements)
@@ -597,17 +619,18 @@ case class MaximumExpression(
 
   override def evalToString: String = s"max(${elements.evalToString})"
 
-  override def eval(context: Map[String, Any]): Integer = {
+  override def eval(context: Map[String, Any]): ReturnT = {
 
-    val evaluatedList: List[Integer] = elements.eval(context)
+    val evaluatedList: List[ReturnT] = elements.eval(context)
+    val numeric = implicitly[Numeric[ReturnT]]
 
-    val maxVal: Int = evaluatedList.map(_.intValue()).max
-    Integer.valueOf(maxVal)
+    evaluatedList.max(numeric)
   }
 
   override def signature: Signature = {
-    val listInputType = scalaTypeToExprType(classTag[List[Integer]].runtimeClass)
-    Signature(inputs = List(listInputType), output = IntType)
+    val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
+    val outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    Signature(inputs = List(listInputType), output = outputType)
   }
 }
 
@@ -618,8 +641,8 @@ object MaximumExpression {
     override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 1, "MaximumExpression.create requires one child.")
 
-      val child = children.head.asInstanceOf[Expression[List[?]]]
-      AllDifferentExpression(child)
+      val child = children.head.asInstanceOf[Expression[List[Integer]]]
+      MaximumExpression[Integer](child)
     }
   }
 }
@@ -696,14 +719,7 @@ case class CumulativeExpression(
       }.map { case (_, _, demand) => demand }.sum
 
 
-      operator.toString match {
-        case "<=" => currentLoad <= cap
-        case "<"  => currentLoad < cap
-        case "="  => currentLoad == cap
-        case ">=" => currentLoad >= cap
-        case ">"  => currentLoad > cap
-        case _    => throw new UnsupportedOperationException(s"Unsupported Cumulative operator: ${operator.toString}")
-      }
+      operator.eval(currentLoad, cap)
     }
   }
 
