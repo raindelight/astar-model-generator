@@ -284,3 +284,13 @@ object ModelParser extends LogTrait {
 
 
 }
+
+object VarNameGenerator {
+  private var counter: Int = 0
+
+  def generateUniqueName(prefix: String = "tmp_var"): String = synchronized {
+    val newName = s"${prefix}_${counter}"
+    counter += 1
+    newName
+  }
+}
