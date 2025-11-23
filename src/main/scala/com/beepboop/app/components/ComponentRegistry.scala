@@ -16,6 +16,11 @@ case object ListIntType extends ExpressionType
 case object SetIntType extends ExpressionType
 case object IteratorType extends ExpressionType
 case object UnknownType extends ExpressionType
+case object ListTaskType extends ExpressionType
+case object MapIntToIntType extends ExpressionType
+case object ListAnyType extends ExpressionType
+case object ListRectType extends ExpressionType
+case object StringType extends ExpressionType
 
 case class Signature(inputs: List[ExpressionType], output: ExpressionType)
 
@@ -23,6 +28,9 @@ case class Signature(inputs: List[ExpressionType], output: ExpressionType)
 def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
   case c if c == classOf[java.lang.Integer] || c == java.lang.Integer.TYPE =>
     IntType
+
+  case c if c == classOf[java.lang.String] =>
+    StringType
 
   case c if c == classOf[java.lang.Boolean] || c == java.lang.Boolean.TYPE =>
     BoolType
@@ -32,6 +40,18 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
 
   case c if c == classOf[Set[Int]] || classOf[Set[?]].isAssignableFrom(c) =>
     SetIntType
+
+  case c if c == classOf[List[Task]] =>
+    ListTaskType
+
+  case c if c == classOf[List[RectDescriptor]] =>
+    ListRectType
+
+  case c if c == classOf[Map[Integer, Integer]] =>
+    MapIntToIntType
+
+  case c if c == classOf[List[Any]] =>
+    ListAnyType
 
   case _ =>
     throw new Exception(s"Unsupported type: ${cls.getName}")
@@ -91,7 +111,9 @@ object ComponentRegistry {
 
   private val expressionFactories: List[Creatable] = List(
     SumExpression.IntListSumFactory,
-    ForAllExpression.ForAllIntListFactory
+    ForAllExpression.ForAllIntListFactory,
+    CountExpression.IntListCountFactory,
+    AllDifferentExpression.ListAllDifferentFactory
   )
 
   val creatables: List[Creatable] =
