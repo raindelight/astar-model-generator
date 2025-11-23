@@ -22,8 +22,14 @@ object ExpressionGenerator extends LogTrait {
     debug(s"chosenCreatable is: ${chosenCreatable.toString}")
     val requiredInputs = chosenCreatable.templateSignature.inputs
     debug(s"requiredInputs for $chosenCreatable are: $requiredInputs")
-    sequence(requiredInputs.map(inputType => generate(inputType, maxDepth - 1)))
+    val result = sequence(requiredInputs.map(inputType => {
+      val generated = generate(inputType, maxDepth - 1)
+      debug(s"we pass required input type $inputType, and we generated ${generated.toString} [${maxDepth - 1}]")
+      generated
+    }))
       .map(children => chosenCreatable.create(children))
+
+    result
   }
 
   private def sequence[T](opts: List[Option[T]]): Option[List[T]] =

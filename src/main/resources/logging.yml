@@ -32,7 +32,7 @@ com.beepboop.app.mutations.ReplaceOperator:
   enabled: false
 
 com.beepboop.app.mutations.ExpressionGenerator:
-  level: WARN
+  level: debug
   enabled: true
 
 

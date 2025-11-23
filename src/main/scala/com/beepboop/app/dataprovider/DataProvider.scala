@@ -33,14 +33,20 @@ object DataProvider extends LogTrait {
   var variables: List[DataItem] = Nil
   var tmpVars: List[DataItem] = List()
   private var variableCreatables: Option[List[Creatable]] = None
+  var solutionContexts: Vector[Map[String, Any]] = Vector();
+
 
   def getSolutionNumber: Int = solutionNumber
 
   def createSolutionContext(solutionNumber: Int): Map[String, Any] =  {
-    val solutionMap: Map[String, Any] = VarRegistry.dataVars.apply(solutionNumber)
+    val solutionMap: Map[String, Any] = VarRegistry.dataVars(solutionNumber)
     val parameterMap: Map[String, Any] = ParameterRegistry.dataPars.map(di => di.name -> di.value).toMap
     val tMap = solutionMap ++ parameterMap
     tMap
+  }
+
+  def getSolutionContext(solutionNumber: Int): Map[String, Any] = {
+    solutionContexts.apply(solutionNumber)
   }
 
   def initalize(originalModelPath: String, dataPath: String, solutionsPath: String): Unit = {
@@ -71,6 +77,9 @@ object DataProvider extends LogTrait {
     }
 
 
+
+
+
     groupedVars.foreach { case (exprType, dataItems) =>
       debug(s"  -> Type: $exprType, Items: ${dataItems.map(_.name).mkString(", ")}")
     }
@@ -81,6 +90,8 @@ object DataProvider extends LogTrait {
         new RandomVariableFactory(exprType, dataItems.map(_.name))
       }.toList
     )
+
+    this.solutionContexts = (0 until solutionCount).map(createSolutionContext).toVector
   }
 
   def getValue(name: String): Any = {
@@ -148,7 +159,7 @@ object DataProvider extends LogTrait {
       if (knownSolutions.isEmpty) {
         throw new IllegalStateException("No solutions found in output file. Aborting.")
       }
-      knownSolutions
+      knownSolutions.toVector
 
     }
     def load(): Unit = { return }

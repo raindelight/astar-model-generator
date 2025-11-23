@@ -126,7 +126,17 @@ case class BinaryExpression[ReturnT](
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
     require(newChildren.length == 2, "BinaryExpression requires exactly two children for reconstruction")
-    this.copy(left = newChildren(0), right = newChildren(1))
+
+    require(
+      newChildren.head.signature.output == operator.signature.inputs.head,
+      s"Left child output data type doesn't match required operator signature input, ${newChildren.head.signature.output} != ${operator.signature.inputs.head} for ${this.operator.toString} (withNewChildren)"
+    )
+
+    require(
+      newChildren(1).signature.output == operator.signature.inputs(1),
+      s"Right child output data type doesn't match required operator signature input, ${newChildren(1).signature.output} != ${operator.signature.inputs(1)} for ${this.operator.toString} (withNewChildren)"
+    )
+    this.copy(left = newChildren.head, right = newChildren(1))
   }
 
   override def toString: String = stringWithSpaces("(", left.toString, operator.toString, right.toString, ")")
@@ -146,10 +156,20 @@ case class BinaryExpression[ReturnT](
 }
 
 object BinaryExpression {
-  def asCreatable(op: BinaryOperator[?]): Creatable = new Creatable {
+  def asCreatable[T](op: BinaryOperator[T]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
-    override def create(children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 2)
+
+
+      require(
+        children(0).signature.output == op.signature.inputs(0),
+        s"Left child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}"
+      )
+      require(
+        children(1).signature.output == op.signature.inputs(1),
+        s"Right child output data type doesn't match required operator signature input, ${children(1).signature.output} != ${op.signature.inputs(1)} for ${op.toString}"
+      )
       BinaryExpression(children(0), op, children(1))
     }
   }
@@ -185,10 +205,11 @@ case class UnaryExpression[ReturnT](
 }
 
 object UnaryExpression {
-  def asCreatable(op: UnaryOperator[?]): Creatable = new Creatable {
+  def asCreatable[T](op: UnaryOperator[T]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
-    override def create(children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 1)
+      require(children(0).signature.output == op.signature.inputs(0), s"Child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}")
       UnaryExpression(children(0), op)
     }
   }
