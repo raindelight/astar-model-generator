@@ -5,8 +5,8 @@ package com.beepboop.app.components
 
 /* own modules */
 import com.beepboop.app.components.Operator
+import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
-
 import com.beepboop.app.dataprovider.DataProvider
 
 sealed trait ExpressionType
@@ -90,7 +90,8 @@ object ComponentRegistry {
   )
 
   private val expressionFactories: List[Creatable] = List(
-    //SumExpression.IntListSumFactory
+    SumExpression.IntListSumFactory,
+    ForAllExpression.ForAllIntListFactory
   )
 
   val creatables: List[Creatable] =

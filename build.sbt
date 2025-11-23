@@ -11,6 +11,7 @@ libraryDependencies += "com.typesafe.play" %% "play-json" % "2.10.0-RC5"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test"
 libraryDependencies += "io.spray" %%  "spray-json" % "1.3.6"
 libraryDependencies += "org.yaml" % "snakeyaml" % "2.2"
+libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 
 enablePlugins(Antlr4Plugin)
 

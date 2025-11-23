@@ -1,9 +1,10 @@
 package com.beepboop.app.components
 
 import com.beepboop.app.components.*
-import com.beepboop.app.dataprovider.DataProvider
+import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.utils.Implicits.integerNumeric
+
 import java.lang.Integer.sum
 
 /* third party modules */
@@ -197,7 +198,7 @@ case class UnaryExpression[ReturnT](
     this.copy(expr = newChildren(0))
   }
 
-  override def toString: String =  operator.toString + expr.toString
+  override def toString: String =  operator.toString + "(" + expr.toString + ")"
   override def evalToString: String = operator.toString + expr.evalToString
 
   override def signature: Signature = operator.signature
@@ -253,7 +254,6 @@ case class SumExpression[ReturnT : Numeric : ClassTag](
 
   override def eval(context: Map[String, Any]): ReturnT = {
     val numeric = implicitly[Numeric[ReturnT]]
-    debug(s"Expr: ${expr.toString}, ${expr.eval(context)}")
     var listToSum = expr.eval(context)
     listToSum.foldLeft(numeric.zero) { (accumulator, element) =>
       numeric.plus(accumulator, element)
@@ -310,10 +310,8 @@ case class ForAllExpression[IterT](
 
   override def eval(context: Map[String, Any]): Boolean = {
     val (variableName, itemsToIterate) = iteratorDef.eval(context)
-    /* todo: ask DataProvider for random name for new variable, and push it's value to DataProvider */
-    /* todo: maybe context should be optional parameter? */
     itemsToIterate.forall { item =>
-      body.eval(context)
+      body.eval(context.+(variableName -> item))
     }
   }
 
@@ -332,8 +330,7 @@ object ForAllExpression {
       val collectionExpr = children(0).asInstanceOf[Expression[List[Integer]]]
       val bodyExpr = children(1).asInstanceOf[Expression[Boolean]]
 
-      /* todo: ask DataProvider for random name for new variable, add it to context */
-      val iterator = IteratorDef("i", collectionExpr)
+      val iterator = IteratorDef(VarNameGenerator.generateUniqueName(), collectionExpr)
 
       ForAllExpression(iterator, bodyExpr)
     }

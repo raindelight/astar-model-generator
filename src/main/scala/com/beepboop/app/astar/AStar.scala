@@ -9,6 +9,7 @@ import com.beepboop.app.mutations.{AllMutations, MutationEngine}
 import com.beepboop.parser.{ModelConstraintGrammarLexer, ModelConstraintGrammarParser}
 import com.typesafe.scalalogging.LazyLogging
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 
 import scala.collection.mutable
 import scala.util.Random
@@ -75,7 +76,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     openSet.enqueue(startNode)
 
     var iterations = 0
-    val maxIterations = 50
+    val maxIterations = 500
 
     while (openSet.nonEmpty && iterations < maxIterations) {
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
@@ -100,37 +101,30 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(visited)
   }
 
-
-
   private def calculateHeuristic(constraint: Expression[?]): Int = {
 
     Profiler.profile("calculateHeuristic") {
       if (numSolutions == 0) return Int.MaxValue
 
-      var satisfiedCount = 0
-      var totalNormalizedDistance: Double = 0.0
-      val beta = 2.0
-      val betaSq = beta * beta
+    val beta = 2.0
+    val betaSq = beta * beta
 
-      val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = 1000
 
-      var i = 0
-      while (i < numSolutions) {
-        try {
-          val context = DataProvider.getSolutionContext(i)
-          val rawDist = constraint.distance(context)
+    var i = 0
+    val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
+      try {
+        val context = DataProvider.createSolutionContext(i)
+        val rawDist = constraint.distance(context)
 
-          if (rawDist == 0) {
-            satisfiedCount += 1
-          } else {
-            totalNormalizedDistance += rawDist.toDouble / (1.0 + rawDist.toDouble)
-          }
-        } catch {
-          case NonFatal(e) =>
-            totalNormalizedDistance += 1.0
-        }
-        i += 1
+        if (rawDist == 0) (1, 0.0) 
+        else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+      } catch {
+        case scala.util.control.NonFatal(e) => (0, 1.0) 
       }
+    }.fold((0, 0.0)) { (acc, elem) =>
+      (acc._1 + elem._1, acc._2 + elem._2)
+    }
 
       val satisfactionRate = satisfiedCount.toDouble / numSolutions.toDouble
       val avgNormDist = totalNormalizedDistance / numSolutions.toDouble
