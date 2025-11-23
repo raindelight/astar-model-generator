@@ -39,7 +39,7 @@ object Profiler {
 
     def toMs(nano: Double): Double = nano / 1_000_000.0
 
-    println("\n--- 📊 Profiler Report ---")
+    println("\n--- Profiler Report ---")
     println(headerFmt.format("Function Name", "Calls", "Total (ms)", "Average (ms)", "Min (ms)", "Max (ms)"))
     println(separator)
 
