@@ -106,7 +106,7 @@ class ForAllExpressionSuite extends AnyFunSuite {
     assert(forallExpr.eval(context) === false)
   }
 
-  test("toString should render the expression correctly") {
+  test("ForAllExpression toString should render the expression correctly") {
     val collection = Constant(List(1, 2, 3))
     val iterator = IteratorDef("i", collection)
     val body = BinaryExpression(
@@ -149,7 +149,7 @@ class CountExpressionSuite extends AnyFunSuite {
     assert(countExpr.eval(context) === 5)
   }
 
-  test("toString should render the expression correctly") {
+  test("CountExpression toString should render the expression correctly") {
     val collection = Constant(List(1, 2))
     val countExpr = CountExpression(collection)
 
@@ -202,7 +202,7 @@ class ExistsExpressionSuite extends AnyFunSuite {
     assert(existsExpr.eval(context) === false)
   }
 
-  test("toString should render the expression correctly") {
+  test("ExistsExpression toString should render the expression correctly") {
     val collection = Constant(List(1, 2))
     val iterator = IteratorDef("i", collection)
     val body = BinaryExpression(Variable[Integer]("i"), GreaterOperator[Integer](), Constant(0))
@@ -240,7 +240,7 @@ class AllDifferentExpressionSuite extends AnyFunSuite {
     assert(allDiffExpr.eval(context) === false)
   }
 
-  test("distance should calculate violation count correctly") {
+  test("AllDifferentExpression distance should calculate violation count correctly") {
     val collection = Constant(List(1, 1, 2, 2, 3))
     val allDiffExpr = AllDifferentExpression(collection)
 
@@ -248,7 +248,7 @@ class AllDifferentExpressionSuite extends AnyFunSuite {
     assert(allDiffExpr.distance(context) === 2)
   }
 
-  test("toString should render correctly") {
+  test("AllDifferentExpression toString should render correctly") {
     val collection = Constant(List(1, 2))
     val allDiffExpr = AllDifferentExpression(collection)
     assert(allDiffExpr.toString === "alldifferent([1, 2])")
@@ -283,7 +283,7 @@ class MinimumExpressionSuite extends AnyFunSuite {
     assert(minExpr.eval(context) === 50)
   }
 
-  test("toString should render correctly") {
+  test("MinimumExpression toString should render correctly") {
     val collection = Constant(List(1, 2).map(Int.box))
     val minExpr = MinimumExpression[Integer](collection)
     assert(minExpr.toString === "min([1, 2])")
@@ -318,7 +318,7 @@ class MaximumExpressionSuite extends AnyFunSuite {
     assert(maxExpr.eval(context) === 99)
   }
 
-  test("toString should render correctly") {
+  test("MaximumExpression toString should render correctly") {
     val collection = Constant(List(1, 2).map(Int.box))
     val maxExpr = MaximumExpression[Integer](collection)
     assert(maxExpr.toString === "max([1, 2])")

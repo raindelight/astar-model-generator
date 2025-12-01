@@ -60,7 +60,11 @@ case class Variable[ReturnT : ClassTag ](name: String) extends Expression[Return
 
 
 case class Constant[ReturnT : ClassTag](value: ReturnT) extends Expression[ReturnT] {
-  override def toString: String = value.toString
+  override def toString: String = value match {
+    case list: List[_] => list.mkString("[", ", ", "]")
+    case arr: Array[_] => arr.mkString("[", ", ", "]")
+    case _ => value.toString
+  }
   override def eval(context: Map[String, Any]): ReturnT = value
   override def evalToString: String = value.toString
   override def signature: Signature = {
@@ -100,7 +104,7 @@ case class IteratorDef[IterT](
   }
 
   override def toString: String = s"$variableName in $collection"
-  override def evalToString: String = s"${variableName} in ${collection}"
+  override def evalToString: String = s"${variableName} in ${collection.evalToString}"
 
   override def signature: Signature = {
     Signature(inputs = Nil, output = UnknownType)
@@ -409,9 +413,9 @@ case class ExistsExpression[IterT](
   override def eval(context: Map[String, Any]): Boolean = {
     val (variableName, itemsToIterate) = iteratorDef.eval(context)
 
-    itemsToIterate.exists { item =>
 
-      body.eval(context)
+    itemsToIterate.exists { item =>
+      body.eval(context.+(variableName -> item))
     }
   }
 
