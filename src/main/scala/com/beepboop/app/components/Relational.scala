@@ -1,6 +1,6 @@
 package com.beepboop.app.components
 
-trait Equatable[T] {
+trait Equatable[T] extends Serializable{
   def equal(a: T, b: T): Boolean
 }
 
@@ -22,7 +22,7 @@ object Equatable {
   }
 }
 
-trait NotEquatable[T] {
+trait NotEquatable[T] extends Serializable{
   def notEqual(a: T, b: T): Boolean
   def distance(a: T, b: T): Int
 }
@@ -64,7 +64,7 @@ object NotEquatable {
   }
 }
 
-trait Contains[L, R] {
+trait Contains[L, R] extends Serializable{
   def contains(left: L, right: R): Boolean
 }
 
@@ -77,7 +77,7 @@ implicit object SetIntContainsInt extends Contains[Set[Int], Int] {
   override def contains(left: Set[Int], right: Int): Boolean = left.contains(right)
 }
 
-trait LessThan[T] {
+trait LessThan[T] extends Serializable{
   def less(a: T, b: T): Boolean
 }
 
@@ -87,7 +87,7 @@ object LessThan {
   }
 }
 
-trait GreaterThan[T] {
+trait GreaterThan[T] extends Serializable{
   def greater(a: T, b: T): Boolean
 }
 
@@ -97,7 +97,7 @@ object GreaterThan {
   }
 }
 
-trait LessEqual[T] {
+trait LessEqual[T] extends Serializable{
   def lessEqual(a: T, b: T): Boolean
 }
 
@@ -107,7 +107,7 @@ object LessEqual {
   }
 }
 
-trait GreaterEqual[T] {
+trait GreaterEqual[T] extends Serializable{
   def greaterEqual(a: T, b: T): Boolean
 }
 
@@ -118,7 +118,7 @@ object GreaterEqual {
 }
 
 
-trait NotComputable[T] {
+trait NotComputable[T] extends Serializable{
   def compute(a: T): Boolean
 }
 

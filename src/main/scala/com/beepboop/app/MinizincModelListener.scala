@@ -1,6 +1,5 @@
 package com.beepboop.app
 
-
 import com.beepboop.parser.NewMinizincParserBaseListener
 import com.beepboop.parser.NewMinizincParser.Var_decl_itemContext
 import org.antlr.v4.runtime.misc.Interval

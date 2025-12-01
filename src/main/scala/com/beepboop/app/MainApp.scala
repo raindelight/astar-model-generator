@@ -9,6 +9,7 @@ import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser, NewMinizincPars
 import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
+import com.beepboop.app.dataprovider.PersistenceManager
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -38,9 +39,18 @@ object MainApp extends LogTrait {
 
 
     val searcher = new AStar(internalGrammar)
+
+    if (new java.io.File("astar_checkpoint.bin").exists() && false) {
+      searcher.loadState("astar_checkpoint.bin")
+    }
+
     val t = searcher.findOptimalModel(ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2).getOrElse(Constant(value = false)), DataProvider.variables, DataProvider.parameters)
-    t.foreach(c => {
-      info(c.toString)
+    t.foreach(nodes => {
+      debug(s"Found ${nodes.size} nodes. Saving results to CSV...")
+      val f = new java.io.File("generated_constraints.csv")
+      if (f.exists()) debug("SUCCESS! File exists on disk.")
+      info("Saving results to CSV...")
+      PersistenceManager.saveConstraintsToCSV(nodes, "generated_constraints.csv")
     })
 
     Profiler.report()
