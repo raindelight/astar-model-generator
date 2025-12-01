@@ -10,6 +10,7 @@ import com.beepboop.parser.{ModelConstraintGrammarLexer, ModelConstraintGrammarP
 import com.typesafe.scalalogging.LazyLogging
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
+import com.beepboop.app.dataprovider.{PersistenceManager, AStarSnapshot}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -30,7 +31,7 @@ case class ModelNodeTMP(
                        constraint: Expression[?],
                        g: Int,
                        h: Int,
-                       ) {
+                       ) extends Serializable {
   val f: Int = g + h
 }
 
@@ -61,24 +62,66 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
   private val numSolutions = DataProvider.solutionCount
   private val mutationEngine = new MutationEngine(AllMutations.mutations)
 
+  private val openSet = mutable.PriorityQueue[ModelNodeTMP]()(ModelNodeTMPOrdering)
+  private val visited = mutable.Set[ModelNodeTMP]()
+  private var isInitialized = false
+
+  def loadState(filename: String): Unit = {
+    PersistenceManager.loadAStarState(filename) match {
+      case scala.util.Success(snapshot) =>
+        this.openSet.clear()
+        this.visited.clear()
+        snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
+        this.visited ++= snapshot.visitedItems
+
+        this.isInitialized = true
+        warn(s"Loaded state! Queue: ${openSet.size}, Visited: ${visited.size}")
+      case scala.util.Failure(e) =>
+        error(s"Failed to load state: ${e.getMessage}")
+    }
+  }
+
+  def saveState(filename: String): Unit = {
+    val snapshot = AStarSnapshot(openSet.toList, visited.toSet)
+    PersistenceManager.saveAStarState(snapshot, filename)
+  }
+
   def findOptimalModel(
                         initialConstraint: Expression[?],
                         availableVars: List[DataItem],
                         dataPars: List[DataItem]
                       ): Option[mutable.Set[ModelNodeTMP]] = {
 
-    val openSet = mutable.PriorityQueue[ModelNodeTMP]()(ModelNodeTMPOrdering)
-    val visited = mutable.Set[ModelNodeTMP]()
+    if (!isInitialized) {
+      openSet.clear()
+      visited.clear()
 
-    val initial_h = calculateHeuristic(initialConstraint)
-    val startNode = ModelNodeTMP(initialConstraint, 1, initial_h)
-    warn(s"Start Node: g=${startNode.g}, h=${startNode.h}, f=${startNode.f}")
-    openSet.enqueue(startNode)
+      val initial_h = calculateHeuristic(initialConstraint)
+      val startNode = ModelNodeTMP(initialConstraint, 1, initial_h)
+      warn(s"Start Node: g=${startNode.g}, h=${startNode.h}, f=${startNode.f}")
+      openSet.enqueue(startNode)
+    }
+    else {
+      warn("Resuming search from loaded state...")
+    }
 
     var iterations = 0
     val maxIterations = 500
+    val saveInterval = 100
 
     while (openSet.nonEmpty && iterations < maxIterations) {
+      if (iterations % saveInterval == 0 && iterations > 0) {
+        saveState("astar_checkpoint.bin")
+        warn("Saving intermediate results to CSV...")
+        PersistenceManager.saveConstraintsToCSV(visited, "generated_constraints.csv")
+      }
+
+      warn("Saving final state checkpoint...")
+      saveState("astar_checkpoint.bin")
+      isInitialized = false
+      warn(s"Search finished after $iterations iterations.")
+      Some(visited)
+
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
       iterations += 1
       val currentNode = openSet.dequeue()
@@ -97,6 +140,8 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
         }
       }
     }
+    isInitialized = false
+
     warn(s"Search finished after $iterations iterations without finding a solution.")
     Some(visited)
   }

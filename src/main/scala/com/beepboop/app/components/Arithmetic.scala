@@ -5,7 +5,7 @@ package com.beepboop.app.components
 /* own modules */
 
 
-trait Addable[T] {
+trait Addable[T] extends Serializable{
   def add(a: T, b: T): T
 }
 
@@ -16,7 +16,7 @@ object Addable {
 }
 
 
-trait Subtractable[T] {
+trait Subtractable[T] extends Serializable{
   def sub(a: T, b: T): T
 }
 
@@ -26,7 +26,7 @@ object Subtractable {
   }
 }
 
-trait Multiplicable[T] {
+trait Multiplicable[T] extends Serializable{
   def mul(a: T, b: T): T
 }
 
@@ -36,7 +36,7 @@ object Multiplicable {
   }
 }
 
-trait Divisible[T] {
+trait Divisible[T] extends Serializable{
   def div(a: T, b: T): T
 }
 
@@ -49,7 +49,7 @@ object Divisible {
   }
 }
 
-trait Modulable[T] {
+trait Modulable[T] extends Serializable{
   def mod(a: T, b: T): T
 }
 
@@ -62,7 +62,7 @@ object Modulable {
   }
 }
 
-trait Andable[T] {
+trait Andable[T] extends Serializable{
   def and(a: T, b: T): T
 }
 
@@ -72,7 +72,7 @@ object Andable {
   }
 }
 
-trait Orable[T] {
+trait Orable[T] extends Serializable{
   def or(a: T, b: T): T
 }
 
@@ -82,7 +82,7 @@ object Orable {
   }
 }
 
-trait Xorable[T] {
+trait Xorable[T] extends Serializable{
   def xor(a: T, b: T): T
 }
 
@@ -92,7 +92,7 @@ object Xorable {
   }
 }
 
-trait Implies[T] {
+trait Implies[T] extends Serializable{
   def implies(a: T, b: T): T
 }
 
@@ -102,7 +102,7 @@ object Implies {
   }
 }
 
-trait Negatable[T] {
+trait Negatable[T] extends Serializable{
   def negate(a: T): T
 }
 
@@ -113,7 +113,7 @@ object Negatable {
   }
 }
 
-trait Absolutable[T] {
+trait Absolutable[T] extends Serializable{
   def abs(a: T): T
 }
 
@@ -123,7 +123,7 @@ object Absolutable {
   }
 }
 
-trait BoolToIntConvertible[T, R] {
+trait BoolToIntConvertible[T, R] extends Serializable{
   def convert(a: T): R
 }
 
