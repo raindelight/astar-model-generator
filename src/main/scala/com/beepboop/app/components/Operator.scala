@@ -12,7 +12,7 @@ import com.beepboop.app.components.{Addable, Signature, NotEquatable, Equatable,
 import com.beepboop.app.logger.LogTrait
 
 
-sealed trait Operator[ReturnT] {
+sealed trait Operator[ReturnT] extends Serializable{
 
   def toString: String
 

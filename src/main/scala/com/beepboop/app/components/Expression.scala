@@ -33,7 +33,7 @@ trait Creatable {
 }
 
 
-sealed trait Expression[ReturnT] extends LogTrait{
+sealed trait Expression[ReturnT] extends LogTrait with Serializable {
   def toString: String
   def eval(context: Map[String, Any]): ReturnT
   def evalToString: String

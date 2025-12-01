@@ -2,7 +2,7 @@ package com.beepboop.app
 
 import com.beepboop.app.components.BinaryExpression
 
-trait ExpressionConfig {
+trait ExpressionConfig  extends Serializable {
 // config similar to LogTrait and LogConfigProvider
   // type of mutation, turned on per Type of Expression
   // max depth ( global, lokalne )
@@ -25,7 +25,7 @@ def stringWithSpaces(strings: String*): String = {
 
 
 // GrammarT - Terminal / NonTerminal
-sealed trait Expression[ReturnT] extends ExpressionConfig {
+sealed trait Expression[ReturnT] extends ExpressionConfig with Serializable {
   def toString: String
 
   def eval: ReturnT
