@@ -1,9 +1,10 @@
 package com.beepboop.app.dataprovider
 
 import com.beepboop.app.astar.ModelNodeTMP
+import com.beepboop.app.components.Expression
 import com.beepboop.app.logger.LogTrait
 import java.io._
-import scala.util.Try
+import scala.util.{Try, Success, Failure}
 
 case class AStarSnapshot(
                           openSetItems: List[ModelNodeTMP],
@@ -11,10 +12,8 @@ case class AStarSnapshot(
                         ) extends Serializable
 
 object PersistenceManager extends LogTrait {
-
   def saveConstraintsToCSV(nodes: Iterable[ModelNodeTMP], filename: String): Unit = {
     val file = new File(filename)
-    warn(s"DEBUG: Attempting to create CSV at absolute path: ${file.getAbsolutePath}")
     val bw = new BufferedWriter(new FileWriter(file))
     try {
       bw.write("Constraint_String|Depth_g|Heuristic_h|Score_f\n")

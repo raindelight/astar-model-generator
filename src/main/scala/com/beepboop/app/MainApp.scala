@@ -46,9 +46,9 @@ object MainApp extends LogTrait {
 
     val t = searcher.findOptimalModel(ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2).getOrElse(Constant(value = false)), DataProvider.variables, DataProvider.parameters)
     t.foreach(nodes => {
-      warn(s"DEBUG: Found ${nodes.size} nodes. Saving results to CSV...")
+      debug(s"Found ${nodes.size} nodes. Saving results to CSV...")
       val f = new java.io.File("generated_constraints.csv")
-      if (f.exists()) warn("DEBUG: SUCCESS! File exists on disk.")
+      if (f.exists()) debug("SUCCESS! File exists on disk.")
       info("Saving results to CSV...")
       PersistenceManager.saveConstraintsToCSV(nodes, "generated_constraints.csv")
     })
