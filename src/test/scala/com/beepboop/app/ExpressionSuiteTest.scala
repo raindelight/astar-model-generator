@@ -2,6 +2,7 @@ package com.beepboop.app
 
 import com.beepboop.app.components._
 import org.scalatest.funsuite.AnyFunSuite
+import com.beepboop.app.utils.Implicits.*
 
 class ForAllExpressionSuite extends AnyFunSuite {
 
@@ -259,15 +260,15 @@ class AllDifferentExpressionSuite extends AnyFunSuite {
 class MinimumExpressionSuite extends AnyFunSuite {
 
   test("MinimumExpression should return the smallest element") {
-    val collection = Constant(List(10, 2, 5))
+    val collection = Constant(List(1, 2, 3).map(Int.box))
     val minExpr = MinimumExpression[Integer](collection)
 
     val context = Map.empty[String, Any]
-    assert(minExpr.eval(context) === 2)
+    assert(minExpr.eval(context) === 1)
   }
 
   test("MinimumExpression should handle negative numbers") {
-    val collection = Constant(List(1, -5, 0))
+    val collection = Constant(List(1, -5, 0).map(Int.box))
     val minExpr = MinimumExpression[Integer](collection)
 
     val context = Map.empty[String, Any]
@@ -283,7 +284,7 @@ class MinimumExpressionSuite extends AnyFunSuite {
   }
 
   test("toString should render correctly") {
-    val collection = Constant(List(1, 2))
+    val collection = Constant(List(1, 2).map(Int.box))
     val minExpr = MinimumExpression[Integer](collection)
     assert(minExpr.toString === "min([1, 2])")
   }
@@ -294,7 +295,7 @@ class MinimumExpressionSuite extends AnyFunSuite {
 class MaximumExpressionSuite extends AnyFunSuite {
 
   test("MaximumExpression should return the largest element") {
-    val collection = Constant(List(10, 2, 5))
+    val collection = Constant(List(10, 2, 5).map(Int.box))
     val maxExpr = MaximumExpression[Integer](collection)
 
     val context = Map.empty[String, Any]
@@ -302,7 +303,7 @@ class MaximumExpressionSuite extends AnyFunSuite {
   }
 
   test("MaximumExpression should handle negative numbers") {
-    val collection = Constant(List(-10, -2, -5))
+    val collection = Constant(List(-10, -2, -5).map(Int.box))
     val maxExpr = MaximumExpression[Integer](collection)
 
     val context = Map.empty[String, Any]
@@ -318,7 +319,7 @@ class MaximumExpressionSuite extends AnyFunSuite {
   }
 
   test("toString should render correctly") {
-    val collection = Constant(List(1, 2))
+    val collection = Constant(List(1, 2).map(Int.box))
     val maxExpr = MaximumExpression[Integer](collection)
     assert(maxExpr.toString === "max([1, 2])")
   }

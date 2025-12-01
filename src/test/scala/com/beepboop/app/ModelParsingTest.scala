@@ -1,5 +1,5 @@
 import com.beepboop.app.ParserUtil
-import com.beepboop.parser.{MinizincGrammarLexer, MinizincGrammarParser, NewMinizincLexer, NewMinizincParser}
+import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Inspectors.*
 import org.antlr.v4.runtime.*

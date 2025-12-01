@@ -282,8 +282,8 @@ object SumExpression {
   }
 }
 
-case class CountExpression[ReturnT : Numeric : ClassTag](
-                            expr: Expression[List[Any]]
+case class CountExpression(
+                            expr: Expression[? <: List[Any]]
                           ) extends Expression[Integer]
   with ComposableExpression {
 
@@ -440,7 +440,7 @@ object ExistsExpression {
 
 
 case class AllDifferentExpression(
-                                   expr: Expression[List[?]]
+                                   expr: Expression[? <: List[?]]
                                  ) extends Expression[Boolean]
   with ComposableExpression {
 
