@@ -116,10 +116,10 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
         PersistenceManager.saveConstraintsToCSV(visited, "generated_constraints.csv")
       }
 
-      warn("Saving final state checkpoint...")
+      info("Saving final state checkpoint...")
       saveState("astar_checkpoint.bin")
       isInitialized = false
-      warn(s"Search finished after $iterations iterations.")
+      info(s"Search finished after $iterations iterations.")
       Some(visited)
 
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
