@@ -29,8 +29,8 @@ object MainApp extends LogTrait {
 
 
     DataProvider.initalize(
-      "models/models/mznc2024_probs/accap/accap.mzn",
-      "models/models/mznc2024_probs/accap/accap_a3_f20_t10.json",
+      "models/mznc2024_probs/accap/accap.mzn",
+      "models/mznc2024_probs/accap/accap_a3_f20_t10.json",
       "models/accap_sols_a10.csv"
     )
 
