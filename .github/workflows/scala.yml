@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,13 +26,12 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: 'sbt'
-    - uses: sbt/setup-sbt@v1
+    - uses: sbt/setup-sbt@3e125ec 
       with:
         sbt-runner-version: 1.11.7
+
     - name: Compile solution
       run: sbt compile
-    - uses: sbt/setup-sbt@v1
-      with:
-        sbt-runner-version: 1.11.7
+
     - name: Run tests
       run: sbt test
