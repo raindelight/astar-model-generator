@@ -25,6 +25,8 @@ libraryDependencies ++= Seq(
   "org.antlr" % "antlr4-runtime" % "4.13.2",
 )
 
+fork := true
+
 enablePlugins(Antlr4Plugin)
 
 //Compile / unmanagedSourceDirectories += baseDirectory.value / "src/main/java"

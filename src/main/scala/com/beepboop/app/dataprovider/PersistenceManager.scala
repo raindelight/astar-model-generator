@@ -14,6 +14,7 @@ case class AStarSnapshot(
 object PersistenceManager extends LogTrait {
   def saveConstraintsToCSV(nodes: Iterable[ModelNodeTMP], filename: String): Unit = {
     val file = new File(filename)
+    Option(file.getParentFile).foreach(_.mkdirs())
     val bw = new BufferedWriter(new FileWriter(file))
     try {
       bw.write("Constraint_String|Depth_g|Heuristic_h|Score_f\n")
@@ -31,6 +32,8 @@ object PersistenceManager extends LogTrait {
   }
 
   def saveAStarState(snapshot: AStarSnapshot, filename: String): Unit = {
+    val file = new File(filename)
+    Option(file.getParentFile).foreach(_.mkdirs())
     useObjectStream(filename) { out =>
       out.writeObject(snapshot)
     }
@@ -46,6 +49,24 @@ object PersistenceManager extends LogTrait {
         in.close()
         fileIn.close()
       }
+    }
+  }
+
+  def saveCheckpoint(snapshot: AStarSnapshot, checkpointPath: String, csvPath: String): Unit = {
+    saveAStarState(snapshot, checkpointPath)
+    if (snapshot.visitedItems.nonEmpty) {
+      saveConstraintsToCSV(snapshot.visitedItems, csvPath)
+    }
+  }
+
+  def performEmergencyBackup(snapshot: AStarSnapshot, checkpointPath: String, csvPath: String): Unit = {
+    try {
+      warn("\n!!! CAUGHT EXIT SIGNAL (Ctrl+C) !!!")
+      warn("PersistenceManager: Attempting emergency backup...")
+      saveCheckpoint(snapshot, checkpointPath, csvPath) // Reużywamy saveCheckpoint!
+      warn("PersistenceManager: Emergency backup completed successfully.")
+    } catch {
+      case e: Exception => error(s"PersistenceManager: Emergency backup failed: ${e.getMessage}")
     }
   }
 
