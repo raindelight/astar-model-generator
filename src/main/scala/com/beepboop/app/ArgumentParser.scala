@@ -60,7 +60,10 @@ object ArgumentParser {
   def printHelp(): Unit = {
     println(
       """
+        |Minizinc Optimal Constraint Generator
+        |
         |Usage: java -jar app.jar [options]
+        |     : sbt "run [options]"
         |
         |Options:
         |  --model <path>          Path to the .mzn model file

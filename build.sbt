@@ -14,6 +14,7 @@ libraryDependencies += "org.yaml" % "snakeyaml" % "2.2"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 
 enablePlugins(Antlr4Plugin)
+enablePlugins(JavaAppPackaging)
 
 
 Antlr4 / antlr4PackageName := Some("com.beepboop.parser")
