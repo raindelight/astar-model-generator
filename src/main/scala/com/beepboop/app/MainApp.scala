@@ -10,7 +10,9 @@ import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 import com.beepboop.app.dataprovider.PersistenceManager
-import com.beepboop.app.utils.ArgumentParser
+import com.beepboop.app.utils.AppConfig
+//import com.beepboop.app.utils.ArgumentParser
+import mainargs.{main, arg, ParserForClass, Flag}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -24,10 +26,7 @@ object MainApp extends LogTrait {
 
   def main(args: Array[String]): Unit = {
 
-    val config = ArgumentParser.parse(args) match {
-      case Some(cfg) => cfg
-      case None => return
-    }
+    val config = ParserForClass[AppConfig].constructOrExit(args)
 
     info("--- Step 1: Configuration ---")
     info(s"Model: ${config.modelPath}")

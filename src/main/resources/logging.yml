@@ -80,3 +80,7 @@ com.beepboop.app.components.SumExpression:
 com.beepboop.app.astar.AStar:
   level: DEBUG
   enabled: true
+
+com.beepboop.app.dataprovider.PersistenceManager:
+  level: DEBUG
+  enabled: true

@@ -12,10 +12,14 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test"
 libraryDependencies += "io.spray" %%  "spray-json" % "1.3.6"
 libraryDependencies += "org.yaml" % "snakeyaml" % "2.2"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
+libraryDependencies += "com.lihaoyi" %% "mainargs" % "0.7.6"
+
+javacOptions ++= Seq("-source", "21", "-target", "21")
 
 enablePlugins(Antlr4Plugin)
 enablePlugins(JavaAppPackaging)
 
+cancelable in Global := true
 
 Antlr4 / antlr4PackageName := Some("com.beepboop.parser")
 Antlr4 / antlr4Version := "4.13.1"
@@ -26,7 +30,7 @@ libraryDependencies ++= Seq(
   "org.antlr" % "antlr4-runtime" % "4.13.2",
 )
 
-fork := true
+fork in Global := true
 
 enablePlugins(Antlr4Plugin)
 

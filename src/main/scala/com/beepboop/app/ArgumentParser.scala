@@ -1,8 +1,13 @@
 package com.beepboop.app.utils
+import java.nio.file.Path
+import mainargs.{main, arg, Flag}
 
+
+@main
 case class AppConfig(
-                      modelPath: String = "models/models/mznc2024_probs/accap/accap.mzn",
-                      dataPath: String = "models/models/mznc2024_probs/accap/accap_a3_f20_t10.json", // Nowy parametr
+                      @arg(positional=true, doc="Path to a model")
+                      modelPath: String,
+                      dataPath: String = "models/mznc2024_probs/accap/accap_a3_f20_t10.json",
                       solutionsPath: Option[String] = Some("models/accap_sols_a10.csv"),
                       maxIterations: Int = 500,
                       saveInterval: Int = 100,
@@ -10,7 +15,7 @@ case class AppConfig(
                       checkpointFile: String = "astar_checkpoint.bin",
                       resume: Boolean = false
                     )
-
+/*
 object ArgumentParser {
 
   def parse(args: Array[String]): Option[AppConfig] = {
@@ -78,3 +83,4 @@ object ArgumentParser {
         |""".stripMargin)
   }
 }
+*/
