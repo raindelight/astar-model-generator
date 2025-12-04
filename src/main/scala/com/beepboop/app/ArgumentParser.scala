@@ -25,7 +25,7 @@ object ArgumentParser {
       case "--model" :: value :: tail =>
         parseRec(tail, config.copy(modelPath = value))
 
-      case "--data" :: value :: tail => // Obsługa pliku danych
+      case "--data" :: value :: tail =>
         parseRec(tail, config.copy(dataPath = value))
 
       case "--solutions" :: value :: tail =>

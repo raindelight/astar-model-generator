@@ -22,9 +22,6 @@ This project addresses these issues by:
 
 - Interpretability: The output is standard, readable MiniZinc code.
 
-## Usage
-
-
 ## Installation & Prerequisites
 To build and run this generator locally, ensure you have the following installed:
 1. Java SDK
@@ -45,6 +42,39 @@ chmod +x scripts/download_models.sh
 # if you are on windows
 ./scripts/download_models.ps1
 ```
+
+## Usage
+The project can be run with hardcoded parameters (which is not recommended) or by providing command-line arguments.
+To run with command-line arguments, make sure to be in project root and use one the following formats:
+```bash 
+chmod +x run
+run [args]
+```
+or
+```bash
+./target/universal/stage/bin/minizinc-model-generator [args]
+```
+both of which use the last correctly compiled version of the project, which can be rebuilt with:
+```bash
+sbt stage
+```
+
+or
+```bash
+sbt "run [args]"
+```
+which compiles the project every time when running.
+
+### Command-Line Arguments
+- `--help`: Displays help information about the command-line arguments. Not to be used with other arguments.
+- `--model <path>`: Path to the MiniZinc model file.
+- `--data <path>`: Path to the MiniZinc data file.
+- `--solutions <path>`: Path to the file containing example solutions.
+- `--max-iter <int>`: Maximum number of iterations for the A* search.
+- `--save-interval <int>`: Interval for saving intermediate results expressed as number of iterations.
+- `--out <path>`: Path to save the constraints at each save interval and the end.
+- `--checkpoint <path>`: Path to save/load the search checkpoint binary file.
+- `--resume`: Resume from the checkpoint file specified by `--checkpoint`.
 
 ## License
 This project is licensed under the *MIT License*. See [LICENSE](LICENSE) file for details.
