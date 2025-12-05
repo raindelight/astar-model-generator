@@ -1,0 +1,100 @@
+package com.beepboop.app.utils
+
+import mainargs.{arg, ParserForClass, Flag}
+
+// 1. Konfiguracja CLI
+case class GeneratorConfig(
+                            @arg(positional = true, doc = "Path to the .mzn model file")
+                            modelPath: String,
+
+                            @arg(positional = true, doc = "Path to the .json/.dzn data file")
+                            dataPath: String,
+
+                            @arg(name = "solutions", short = 's', doc = "Path to the known solutions CSV")
+                            solutionsPath: Seq[String],
+
+                            @arg(short = 'i', doc = "Maximum number of A* iterations")
+                            maxIterations: Int = 500,
+
+                            @arg(doc = "How often to save checkpoint/CSV")
+                            saveInterval: Int = 100,
+
+                            @arg(short = 'o', doc = "Output CSV file path")
+                            outputCsv: String = "generated_constraints.csv",
+
+                            @arg(short = 'c', doc = "Checkpoint file path")
+                            checkpointFile: String = "astar_checkpoint.bin",
+
+                            @arg(short = 'r', doc = "Resume from checkpoint if exists")
+                            resume: Flag
+                          )
+
+case class AppConfig(
+                      modelPath: String,
+                      dataPath: String,
+                      solutionsPath: Option[String],
+                      maxIterations: Int,
+                      saveInterval: Int,
+                      outputCsv: String,
+                      checkpointFile: String,
+                      resume: Boolean
+                    )
+
+object ArgumentParser {
+
+  private val parser = ParserForClass[GeneratorConfig]
+
+  private val HelpHeader =
+    """
+      |AStar Model Generator v1.0
+      |Generates MiniZinc constraints using A* search algorithm based on provided data.
+      |
+      |Usage: sbt "run <modelPath> <dataPath> [options]"
+      |""".stripMargin
+
+  private val HelpFooter =
+    """
+      |EXAMPLES:
+      |  Basic run:
+      |    sbt "run models/accap.mzn models/accap.json -s models/sols.csv"
+      |
+      |  Resume:
+      |    sbt "run models/accap.mzn models/accap.json -s models/sols.csv -r"
+      |""".stripMargin
+
+  def parse(args: Array[String]): Option[AppConfig] = {
+
+    if (args.contains("--help") || args.contains("-h")) {
+
+      val rawLibraryHelp = parser.helpText(customName = "astar-generator")
+
+      val optionsList = rawLibraryHelp.linesIterator.drop(1).mkString("\n")
+
+      println(HelpHeader)
+      println("Options:")
+      println(optionsList)
+      println(HelpFooter)
+
+      return None
+    }
+
+    parser.constructEither(args.toSeq) match {
+      case Right(cli) =>
+        Some(AppConfig(
+          modelPath = cli.modelPath,
+          dataPath = cli.dataPath,
+          solutionsPath = cli.solutionsPath.headOption,
+          maxIterations = cli.maxIterations,
+          saveInterval = cli.saveInterval,
+          outputCsv = cli.outputCsv,
+          checkpointFile = cli.checkpointFile,
+          resume = cli.resume.value
+        ))
+
+      case Left(errorMsg) =>
+        println(s"Error parsing arguments: $errorMsg")
+        println("\nRun with --help to see usage.")
+        None
+    }
+  }
+}

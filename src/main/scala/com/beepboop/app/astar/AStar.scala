@@ -66,30 +66,27 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
   private val visited = mutable.Set[ModelNodeTMP]()
   private var isInitialized = false
 
-  def loadState(filename: String): Unit = {
-    PersistenceManager.loadAStarState(filename) match {
-      case scala.util.Success(snapshot) =>
-        this.openSet.clear()
-        this.visited.clear()
-        snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
-        this.visited ++= snapshot.visitedItems
-
-        this.isInitialized = true
-        warn(s"Loaded state! Queue: ${openSet.size}, Visited: ${visited.size}")
-      case scala.util.Failure(e) =>
-        error(s"Failed to load state: ${e.getMessage}")
-    }
+  def getSnapshot: AStarSnapshot = {
+    AStarSnapshot(openSet.toList, visited.toSet)
   }
 
-  def saveState(filename: String): Unit = {
-    val snapshot = AStarSnapshot(openSet.toList, visited.toSet)
-    PersistenceManager.saveAStarState(snapshot, filename)
+  def restoreState(snapshot: AStarSnapshot): Unit = {
+    this.openSet.clear()
+    this.visited.clear()
+    snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
+    this.visited ++= snapshot.visitedItems
+    this.isInitialized = true
+    warn(s"State restored! Queue: ${openSet.size}, Visited: ${visited.size}")
   }
 
   def findOptimalModel(
                         initialConstraint: Expression[?],
                         availableVars: List[DataItem],
-                        dataPars: List[DataItem]
+                        dataPars: List[DataItem],
+                        maxIterations: Int,
+                        saveInterval: Int,
+                        checkpointFile: String,
+                        outputCsvFile: String
                       ): Option[mutable.Set[ModelNodeTMP]] = {
 
     if (!isInitialized) {
@@ -106,20 +103,13 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     }
 
     var iterations = 0
-    val maxIterations = 500
-    val saveInterval = 100
 
     while (openSet.nonEmpty && iterations < maxIterations) {
       if (iterations % saveInterval == 0 && iterations > 0) {
-        saveState("astar_checkpoint.bin")
-        warn("Saving intermediate results to CSV...")
-        PersistenceManager.saveConstraintsToCSV(visited, "generated_constraints.csv")
+        PersistenceManager.saveCheckpoint(getSnapshot, checkpointFile, outputCsvFile)
+        warn(s"Checkpoint saved at iteration $iterations.")
       }
-
-      info("Saving final state checkpoint...")
-      saveState("astar_checkpoint.bin")
-      isInitialized = false
-      info(s"Search finished after $iterations iterations.")
+      
       Some(visited)
 
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
@@ -140,8 +130,11 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
         }
       }
     }
-    isInitialized = false
 
+    info("Saving final state checkpoint...")
+    PersistenceManager.saveCheckpoint(getSnapshot, checkpointFile, outputCsvFile)
+    info(s"Search finished after $iterations iterations.")
+    isInitialized = false
     warn(s"Search finished after $iterations iterations without finding a solution.")
     Some(visited)
   }
