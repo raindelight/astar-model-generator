@@ -62,11 +62,11 @@ object PersistenceManager extends LogTrait {
   def performEmergencyBackup(snapshot: AStarSnapshot, checkpointPath: String, csvPath: String): Unit = {
     try {
       warn("\n!!! CAUGHT EXIT SIGNAL (Ctrl+C) !!!")
-      warn("PersistenceManager: Attempting emergency backup...")
+      warn("Attempting emergency backup...")
       saveCheckpoint(snapshot, checkpointPath, csvPath) // Reużywamy saveCheckpoint!
-      warn("PersistenceManager: Emergency backup completed successfully.")
+      warn("Emergency backup completed successfully.")
     } catch {
-      case e: Exception => error(s"PersistenceManager: Emergency backup failed: ${e.getMessage}")
+      case e: Exception => error(s"Emergency backup failed: ${e.getMessage}")
     }
   }
 

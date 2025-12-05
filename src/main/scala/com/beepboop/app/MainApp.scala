@@ -5,14 +5,13 @@ import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistr
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.Profiler
 import com.beepboop.app.mutations.{AllMutations, ExpressionGenerator, MutationEngine}
-import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser, NewMinizincParserBaseListener}
 import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 import com.beepboop.app.dataprovider.PersistenceManager
-import com.beepboop.app.utils.AppConfig
-//import com.beepboop.app.utils.ArgumentParser
-import mainargs.{main, arg, ParserForClass, Flag}
+//import com.beepboop.app.utils.{GeneratorConfig, ArgumentParser}
+import com.beepboop.app.utils.ArgumentParser
+//import mainargs.{main, arg, ParserForClass, Flag}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -26,7 +25,9 @@ object MainApp extends LogTrait {
 
   def main(args: Array[String]): Unit = {
 
-    val config = ParserForClass[AppConfig].constructOrExit(args)
+    val configOpt = ArgumentParser.parse(args)
+    if (configOpt.isEmpty) return
+    val config = configOpt.get
 
     info("--- Step 1: Configuration ---")
     info(s"Model: ${config.modelPath}")
@@ -37,7 +38,7 @@ object MainApp extends LogTrait {
     info("Loading parsed constraint grammar...")
     val internalGrammar: ParsedGrammar = GrammarConverter.parseConstraintGrammar()
     debug(ParsedGrammar.toString)
-    
+
     DataProvider.initalize(
       config.modelPath,
       config.dataPath,
@@ -109,6 +110,6 @@ object MainApp extends LogTrait {
 
 
 
-    
+
   }
 }
