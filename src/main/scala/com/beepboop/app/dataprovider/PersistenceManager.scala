@@ -61,10 +61,10 @@ object PersistenceManager extends LogTrait {
 
   def performEmergencyBackup(snapshot: AStarSnapshot, checkpointPath: String, csvPath: String): Unit = {
     try {
-      warn("\n!!! CAUGHT EXIT SIGNAL (Ctrl+C) !!!")
-      warn("Attempting emergency backup...")
+      scala.Console.err.println("\n!!! CAUGHT EXIT SIGNAL (Ctrl+C) !!!")
+      scala.Console.err.println("Attempting emergency backup...")
       saveCheckpoint(snapshot, checkpointPath, csvPath) // Reużywamy saveCheckpoint!
-      warn("Emergency backup completed successfully.")
+      scala.Console.err.println("Emergency backup completed successfully.")
     } catch {
       case e: Exception => error(s"Emergency backup failed: ${e.getMessage}")
     }
@@ -79,7 +79,7 @@ object PersistenceManager extends LogTrait {
       fileOut.close()
       info(s"Successfully saved binary state to $filename")
     } catch {
-      case e: Exception => error(s"Failed to save binary state: ${e.getMessage}")
+      case e: Exception => scala.Console.err.println(s"Emergency backup failed: ${e.getMessage}")
     }
   }
 }
