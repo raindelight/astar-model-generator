@@ -9,8 +9,10 @@ import com.beepboop.app.mutations.{AllMutations, MutationEngine}
 import com.beepboop.parser.{ModelConstraintGrammarLexer, ModelConstraintGrammarParser}
 import com.typesafe.scalalogging.LazyLogging
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
-import com.beepboop.app.dataprovider.{PersistenceManager, AStarSnapshot}
+import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
+import com.beepboop.app.policy.{Compliant, EnsureVarExists, NonCompliant, Scanner}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -211,11 +213,17 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     debug(possibleMutations.toString)
     val neighbors = possibleMutations.flatMap {
       case (targetNode, mutationFunc) =>
-        val maybeReplacement = mutationFunc(targetNode)
+       mutationFunc(targetNode).flatMap { replacement =>
+         val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
+         val result = Scanner.visitAll(candidateTree, EnsureVarExists())
 
-        maybeReplacement.map { replacement =>
-          mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
-        }
+         if (result.isAllowed) {
+           Some(candidateTree)
+         } else {
+           debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+           None
+         }
+       }
     }
     debug(neighbors.toString)
     neighbors.toSet.toList
