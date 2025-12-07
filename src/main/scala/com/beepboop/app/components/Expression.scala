@@ -155,9 +155,15 @@ case class BinaryExpression[ReturnT](
   }
   override def signature: Signature = operator.signature
 
-
   override def distance(context: Map[String, Any]): Int = {
-    operator.distance(left.eval(context), right.eval(context))
+    operator match {
+      case _: AndOperator[_] =>
+        left.distance(context) + right.distance(context)
+      case _: OrOperator[_] =>
+        Math.min(left.distance(context), right.distance(context))
+      case _ =>
+        operator.distance(left.eval(context), right.eval(context))
+    }
   }
 }
 
@@ -263,8 +269,6 @@ case class SumExpression[ReturnT : Numeric : ClassTag](
     listToSum.foldLeft(numeric.zero) { (accumulator, element) =>
       numeric.plus(accumulator, element)
     }
-    numeric.asInstanceOf[ReturnT]
-
   }
   override def signature: Signature = {
     val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
