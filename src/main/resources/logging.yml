@@ -78,9 +78,17 @@ com.beepboop.app.components.SumExpression:
   enabled: true
 
 com.beepboop.app.astar.AStar:
-  level: DEBUG
+  level: INFO
   enabled: true
 
 com.beepboop.app.dataprovider.PersistenceManager:
   level: DEBUG
   enabled: true
+
+com.beepboop.app.components.ComponentRegistry:
+  level: DEBUG
+  enabled: true
+
+com.beepboop.app.postprocessor.JoinConstants:
+  level: DEBUG
+  enabled: false
