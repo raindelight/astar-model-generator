@@ -30,9 +30,9 @@ case class ModelNode(
 
 
 case class ModelNodeTMP(
-                       constraint: Expression[?],
-                       g: Int,
-                       h: Int,
+                         constraint: Expression[?],
+                         g: Int,
+                         h: Int,
                        ) extends Serializable {
   val f: Int = g + h
 }
@@ -65,18 +65,19 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
   private val mutationEngine = new MutationEngine(AllMutations.mutations)
 
   private val openSet = mutable.PriorityQueue[ModelNodeTMP]()(ModelNodeTMPOrdering)
-  private val visited = mutable.Set[ModelNodeTMP]()
+  private val visited = mutable.Set[Expression[?]]()
   private var isInitialized = false
 
   def getSnapshot: AStarSnapshot = {
-    AStarSnapshot(openSet.toList, visited.toSet)
+    val visitedNodes = visited.map(expr => ModelNodeTMP(expr, 0, 0)).toSet
+    AStarSnapshot(openSet.toList, visitedNodes)
   }
 
   def restoreState(snapshot: AStarSnapshot): Unit = {
     this.openSet.clear()
     this.visited.clear()
     snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
-    this.visited ++= snapshot.visitedItems
+    this.visited ++= snapshot.visitedItems.map(_.constraint)
     this.isInitialized = true
     warn(s"State restored! Queue: ${openSet.size}, Visited: ${visited.size}")
   }
@@ -111,7 +112,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
         PersistenceManager.saveCheckpoint(getSnapshot, checkpointFile, outputCsvFile)
         warn(s"Checkpoint saved at iteration $iterations.")
       }
-      
+
       Some(visited)
 
       info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
@@ -119,12 +120,12 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       val currentNode = openSet.dequeue()
       info(s"Dequeuing node: $currentNode")
 
-      visited.add(currentNode)
+      visited.add(currentNode.constraint)
       debug(visited.toString)
       val generated = generateNeighbors(currentNode)
       info(s"Generated neighbors: ${generated.size}")
       generated.foreach { neighborConstraint =>
-        if(!visited.map(m => m.constraint).contains(neighborConstraint)) {
+        if (!visited.contains(neighborConstraint)) {
           val h = calculateHeuristic(neighborConstraint)
           val neighbourNode = ModelNodeTMP(neighborConstraint, currentNode.g + 1, h)
           debug(s"Enqueuing node: $neighbourNode")
@@ -138,7 +139,8 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     info(s"Search finished after $iterations iterations.")
     isInitialized = false
     warn(s"Search finished after $iterations iterations without finding a solution.")
-    Some(visited)
+    val resultNodes = visited.map(c => ModelNodeTMP(c, 0, 0))
+    Some(resultNodes)
   }
 
   private def calculateHeuristic(constraint: Expression[?]): Int = {
@@ -146,25 +148,39 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Profiler.profile("calculateHeuristic") {
       if (numSolutions == 0) return Int.MaxValue
 
-    val beta = 2.0
-    val betaSq = beta * beta
+      val beta = 2.0
+      val betaSq = beta * beta
 
-    val SCALING_FACTOR = 1000
+      val SCALING_FACTOR = 1000
 
-    var i = 0
-    val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
-      try {
-        val context = DataProvider.createSolutionContext(i)
-        val rawDist = constraint.distance(context)
+      val results = (0 until numSolutions).map { i => // Usuń '.par' dla czytelności logów debugowania
+        try {
+          val context = DataProvider.createSolutionContext(i)
+          val rawDist = constraint.distance(context)
 
-        if (rawDist == 0) (1, 0.0) 
-        else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
-      } catch {
-        case scala.util.control.NonFatal(e) => (0, 1.0) 
+          // println(s"[DEBUG] Sol #$i | Constraint: $constraint | RawDist: $rawDist | Context: $context")
+
+          if (rawDist == 0) (1, 0.0)
+          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+        } catch {
+          case scala.util.control.NonFatal(e) => (0, 1.0)
+        }
       }
-    }.fold((0, 0.0)) { (acc, elem) =>
-      (acc._1 + elem._1, acc._2 + elem._2)
-    }
+
+      var i = 0
+      val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
+        try {
+          val context = DataProvider.createSolutionContext(i)
+          val rawDist = constraint.distance(context)
+
+          if (rawDist == 0) (1, 0.0)
+          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+        } catch {
+          case scala.util.control.NonFatal(e) => (0, 1.0)
+        }
+      }.fold((0, 0.0)) { (acc, elem) =>
+        (acc._1 + elem._1, acc._2 + elem._2)
+      }
 
       val satisfactionRate = satisfiedCount.toDouble / numSolutions.toDouble
       val avgNormDist = totalNormalizedDistance / numSolutions.toDouble
@@ -196,9 +212,9 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
 
     constraints.map(c =>
       val totalDistance = (0 until numSolutions).map { solutionIndex =>  {
-          val context = DataProvider.getSolutionContext(solutionIndex)
-          constraints.map(c => c.distance(context)).sum
-        }
+        val context = DataProvider.getSolutionContext(solutionIndex)
+        constraints.map(c => c.distance(context)).sum
+      }
       }.min
       info(s"Max distance for expression ${c.toString}: $totalDistance")
     )
@@ -213,17 +229,17 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     debug(possibleMutations.toString)
     val neighbors = possibleMutations.flatMap {
       case (targetNode, mutationFunc) =>
-       mutationFunc(targetNode).flatMap { replacement =>
-         val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
-         val result = Scanner.visitAll(candidateTree, EnsureVarExists())
+        mutationFunc(targetNode).flatMap { replacement =>
+          val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
+          val result = Scanner.visitAll(candidateTree, EnsureVarExists())
 
-         if (result.isAllowed) {
-           Some(candidateTree)
-         } else {
-           debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
-           None
-         }
-       }
+          if (result.isAllowed) {
+            Some(candidateTree)
+          } else {
+            debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+            None
+          }
+        }
     }
     debug(neighbors.toString)
     neighbors.toSet.toList

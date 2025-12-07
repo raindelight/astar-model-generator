@@ -121,7 +121,7 @@ class EqualOperator[T: ClassTag](implicit strategy: Equatable[T]) extends Binary
     val leftT = left.asInstanceOf[T]
     val rightT = right.asInstanceOf[T]
 
-    if (classTag[T].runtimeClass.isAssignableFrom(classOf[Number])) {
+    if (classOf[Number].isAssignableFrom(classTag[T].runtimeClass)) {
       Math.abs(leftT.asInstanceOf[Number].intValue() - rightT.asInstanceOf[Number].intValue())
     } else if (leftT.isInstanceOf[Set[?]] && rightT.isInstanceOf[Set[?]]) {
       // Oblicz odległość dla zbiorów (np. rozmiar różnicy symetrycznej)
