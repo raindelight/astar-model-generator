@@ -153,7 +153,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
 
       val SCALING_FACTOR = 1000
 
-      val results = (0 until numSolutions).map { i => // Usuń '.par' dla czytelności logów debugowania
+      val results = (0 until numSolutions).par.map { i =>
         try {
           val context = DataProvider.createSolutionContext(i)
           val rawDist = constraint.distance(context)
