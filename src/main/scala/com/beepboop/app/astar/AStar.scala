@@ -67,11 +67,11 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
   private val mutationEngine = new MutationEngine(AllMutations.mutations)
 
   private val openSet = mutable.PriorityQueue[ModelNodeTMP]()(ModelNodeTMPOrdering)
-  private val visited = mutable.Set[Expression[?]]()
+  private val visited = mutable.Map[Expression[?], ModelNodeTMP]()
   private var isInitialized = false
 
   def getSnapshot: AStarSnapshot = {
-    val visitedNodes = visited.map(expr => ModelNodeTMP(expr, 0, 0)).toSet
+    val visitedNodes = visited.values.toSet
     AStarSnapshot(openSet.toList, visitedNodes)
   }
 
@@ -79,7 +79,9 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     this.openSet.clear()
     this.visited.clear()
     snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
-    this.visited ++= snapshot.visitedItems.map(_.constraint)
+    
+    snapshot.visitedItems.foreach(node => visited(node.constraint) = node)
+
     this.isInitialized = true
     warn(s"State restored! Queue: ${openSet.size}, Visited: ${visited.size}")
   }
@@ -122,7 +124,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       val currentNode = openSet.dequeue()
       info(s"Dequeuing node: $currentNode")
 
-      visited.add(currentNode.constraint)
+      visited(currentNode.constraint) = currentNode
       debug(visited.toString)
       val generated = generateNeighbors(currentNode)
       info(s"Generated neighbors: ${generated.size}")
@@ -141,7 +143,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     info(s"Search finished after $iterations iterations.")
     isInitialized = false
     warn(s"Search finished after $iterations iterations without finding a solution.")
-    val resultNodes = visited.map(c => ModelNodeTMP(c, 0, 0))
+    val resultNodes = scala.collection.mutable.Set.from(visited.values)
     Some(resultNodes)
   }
 
@@ -152,7 +154,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
 
       val beta = 2.0
       val betaSq = beta * beta
-
       val SCALING_FACTOR = 1000
 
       val results = (0 until numSolutions).par.map { i =>
