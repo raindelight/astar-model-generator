@@ -3,9 +3,12 @@ package com.beepboop.app.components
 import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
+import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
 
 import java.lang.Integer.sum
+import java.util
 
 
 /* third party modules */
@@ -15,6 +18,9 @@ def stringWithSpaces(strings: String*): String = {
   strings.mkString(" ")
 }
 
+trait ScopeModifier {
+  def getAdditionalPolicies: List[Policy]
+}
 
 trait ComposableExpression {
   def children: List[Expression[?]]
@@ -33,7 +39,7 @@ trait Creatable {
 }
 
 
-sealed trait Expression[ReturnT] extends LogTrait with Serializable {
+abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends LogTrait with Serializable {
   def toString: String
   def eval(context: Map[String, Any]): ReturnT
   def evalToString: String
@@ -71,7 +77,6 @@ case class Constant[ReturnT : ClassTag](value: ReturnT) extends Expression[Retur
     val outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
     Signature(inputs = Nil, output = outputType)
   }
-
 }
 
 object Constant {
@@ -88,7 +93,7 @@ object Constant {
   }
 }
 
-case class IteratorDef[IterT](
+case class IteratorDef[IterT : ClassTag](
                              variableName: String,
                              collection: Expression[List[IterT]]
                              ) extends Expression[(String, List[IterT])] with ComposableExpression {
@@ -112,7 +117,7 @@ case class IteratorDef[IterT](
 
 }
 
-case class BinaryExpression[ReturnT](
+case class BinaryExpression[ReturnT : ClassTag](
                                       left: Expression[?],
                                       operator: BinaryOperator[ReturnT],
                                       right: Expression[?]
@@ -135,12 +140,13 @@ case class BinaryExpression[ReturnT](
 
     require(
       newChildren.head.signature.output == operator.signature.inputs.head,
-      s"Left child output data type doesn't match required operator signature input, ${newChildren.head.signature.output} != ${operator.signature.inputs.head} for ${this.operator.toString} (withNewChildren)"
+      s"Left child output data type doesn't match required operator signature input, (new)${newChildren.head.signature.output} != ${operator.signature.inputs.head} for ${this.operator.toString} [${this.toString}] (${newChildren}) | withNewChildren"
     )
 
     require(
       newChildren(1).signature.output == operator.signature.inputs(1),
-      s"Right child output data type doesn't match required operator signature input, ${newChildren(1).signature.output} != ${operator.signature.inputs(1)} for ${this.operator.toString} (withNewChildren)"
+      s"Right child output data type doesn't match required operator signature input, (new)${newChildren(1).signature.output} != ${operator.signature.inputs(1)} for ${this.operator.toString} " +
+        s" [${this.toString}] (${newChildren}) | withNewChildren"
     )
     this.copy(left = newChildren.head, right = newChildren(1))
   }
@@ -172,7 +178,7 @@ object BinaryExpression {
     override def templateSignature: Signature = op.signature
     override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 2)
-
+      implicit val tag: ClassTag[T] = op.ct
 
       require(
         children(0).signature.output == op.signature.inputs(0),
@@ -182,12 +188,12 @@ object BinaryExpression {
         children(1).signature.output == op.signature.inputs(1),
         s"Right child output data type doesn't match required operator signature input, ${children(1).signature.output} != ${op.signature.inputs(1)} for ${op.toString}"
       )
-      BinaryExpression(children(0), op, children(1))
+      BinaryExpression(children(0).asInstanceOf[Expression[T]] , op, children(1).asInstanceOf[Expression[T]])
     }
   }
 }
 
-case class UnaryExpression[ReturnT](
+case class UnaryExpression[ReturnT : ClassTag](
                                    expr: Expression[?],
                                    operator: UnaryOperator[ReturnT]
                                    ) extends Expression[ReturnT]
@@ -220,6 +226,7 @@ object UnaryExpression {
   def asCreatable[T](op: UnaryOperator[T]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
     override def create(children: List[Expression[?]]): Expression[T] = {
+      implicit val tag: ClassTag[T] = op.ct
       require(children.length == 1)
       require(children(0).signature.output == op.signature.inputs(0), s"Child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}")
       UnaryExpression(children(0), op)
@@ -346,7 +353,9 @@ if (allTrue) 1 else 0
 case class ForAllExpression[IterT](
                                     iteratorDef: IteratorDef[IterT], // This is now an Expression
                                     body: Expression[Boolean]
-                                  ) extends Expression[Boolean] with ComposableExpression {
+                                  ) extends Expression[Boolean]
+                                    with ComposableExpression
+                                    with ScopeModifier {
 
   override def children: List[Expression[?]] = List(iteratorDef, body)
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
@@ -355,6 +364,10 @@ case class ForAllExpression[IterT](
       iteratorDef = newChildren(0).asInstanceOf[IteratorDef[IterT]],
       body = newChildren(1).asInstanceOf[Expression[Boolean]]
     )
+  }
+
+  override def getAdditionalPolicies: List[Policy] = {
+    List(EnsureSpecificVarExists(iteratorDef.variableName))
   }
 
   override def toString: String = s"forall($iteratorDef)($body)"
@@ -913,7 +926,7 @@ case class RectDescriptor(
 
 
 case class DiffnExpression(
-                            rectsExpr: Expression[List[RectDescriptor]] // Lista symbolicznych obiektów RectDescriptor
+                            rectsExpr: Expression[List[RectDescriptor]]
                           ) extends Expression[Boolean]
   with ComposableExpression {
 
@@ -1121,7 +1134,7 @@ object ValuePrecedesChainExpression {
 }
 
 
-case class RedundantConstraint[T](
+case class RedundantConstraint[T : ClassTag](
                                    innerConstraint: Expression[T]
                                  ) extends Expression[T]
   with ComposableExpression {

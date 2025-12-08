@@ -12,7 +12,7 @@ import com.beepboop.app.components.{Addable, Signature, NotEquatable, Equatable,
 import com.beepboop.app.logger.LogTrait
 
 
-sealed trait Operator[ReturnT] extends Serializable{
+abstract class Operator[ReturnT](implicit val ct: ClassTag[ReturnT]) extends Serializable{
 
   def toString: String
 
@@ -21,15 +21,15 @@ sealed trait Operator[ReturnT] extends Serializable{
   def distance(left: Any, right: Any): Int = 0
 }
 
-trait UnaryOperator[ReturnT] extends Operator[ReturnT] {
+abstract class UnaryOperator[ReturnT](implicit ct: ClassTag[ReturnT]) extends Operator[ReturnT] {
   def eval(expr: Any): ReturnT
 }
 
-trait BinaryOperator[ReturnT] extends Operator[ReturnT] {
+abstract class BinaryOperator[ReturnT](implicit ct: ClassTag[ReturnT]) extends Operator[ReturnT] {
   def eval(left: Any, right: Any): ReturnT
 }
 
-class AddOperator[T: ClassTag](implicit strategy: Addable[T]) extends BinaryOperator[T] {
+case class AddOperator[T: ClassTag]()(implicit strategy: Addable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.add(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -44,7 +44,7 @@ class AddOperator[T: ClassTag](implicit strategy: Addable[T]) extends BinaryOper
 }
 
 
-class SubOperator[T: ClassTag](implicit strategy: Subtractable[T]) extends BinaryOperator[T] {
+case class SubOperator[T: ClassTag]()(implicit strategy: Subtractable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.sub(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -59,7 +59,7 @@ class SubOperator[T: ClassTag](implicit strategy: Subtractable[T]) extends Binar
 }
 
 
-class MulOperator[T: ClassTag](implicit strategy: Multiplicable[T]) extends BinaryOperator[T] {
+case class MulOperator[T: ClassTag]()(implicit strategy: Multiplicable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.mul(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -73,7 +73,7 @@ class MulOperator[T: ClassTag](implicit strategy: Multiplicable[T]) extends Bina
   }
 }
 
-class DivOperator[T: ClassTag](implicit strategy: Divisible[T]) extends BinaryOperator[T] {
+case class DivOperator[T: ClassTag]()(implicit strategy: Divisible[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.div(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -88,7 +88,7 @@ class DivOperator[T: ClassTag](implicit strategy: Divisible[T]) extends BinaryOp
 }
 
 
-class ModOperator[T: ClassTag](implicit strategy: Modulable[T]) extends BinaryOperator[T] {
+case class ModOperator[T: ClassTag]()(implicit strategy: Modulable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.mod(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -104,7 +104,7 @@ class ModOperator[T: ClassTag](implicit strategy: Modulable[T]) extends BinaryOp
 
 
 
-class EqualOperator[T: ClassTag](implicit strategy: Equatable[T]) extends BinaryOperator[Boolean] {
+case class EqualOperator[T: ClassTag]()(implicit strategy: Equatable[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = {
     strategy.equal(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -124,7 +124,6 @@ class EqualOperator[T: ClassTag](implicit strategy: Equatable[T]) extends Binary
     if (classOf[Number].isAssignableFrom(classTag[T].runtimeClass)) {
       Math.abs(leftT.asInstanceOf[Number].intValue() - rightT.asInstanceOf[Number].intValue())
     } else if (leftT.isInstanceOf[Set[?]] && rightT.isInstanceOf[Set[?]]) {
-      // Oblicz odległość dla zbiorów (np. rozmiar różnicy symetrycznej)
       try {
         val s1 = leftT.asInstanceOf[Set[Any]]
         val s2 = rightT.asInstanceOf[Set[Any]]
@@ -138,7 +137,7 @@ class EqualOperator[T: ClassTag](implicit strategy: Equatable[T]) extends Binary
   }
 }
 
-class NotEqualOperator[T: ClassTag](implicit strategy: NotEquatable[T]) extends BinaryOperator[Boolean] {
+case class NotEqualOperator[T: ClassTag]()(implicit strategy: NotEquatable[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = {
     strategy.notEqual(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -157,7 +156,7 @@ class NotEqualOperator[T: ClassTag](implicit strategy: NotEquatable[T]) extends 
   }
 }
 
-class ContainsOperator[L: ClassTag, R: ClassTag](implicit strategy: Contains[L, R]) extends BinaryOperator[Boolean] {
+case class ContainsOperator[L: ClassTag, R: ClassTag]()(implicit strategy: Contains[L, R]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = strategy.contains(left.asInstanceOf[L], right.asInstanceOf[R])
 
   override def toString: String = "contains"
@@ -171,7 +170,7 @@ class ContainsOperator[L: ClassTag, R: ClassTag](implicit strategy: Contains[L, 
   }
 }
 
-class LessOperator[T: ClassTag](implicit strategy: LessThan[T]) extends BinaryOperator[Boolean] {
+case class LessOperator[T: ClassTag]()(implicit strategy: LessThan[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = strategy.less(left.asInstanceOf[T], right.asInstanceOf[T])
   override def toString: String = "<"
   override def signature: Signature = {
@@ -192,7 +191,7 @@ class LessOperator[T: ClassTag](implicit strategy: LessThan[T]) extends BinaryOp
   }
 }
 
-class LessEqualOperator[T: ClassTag](implicit strategy: LessEqual[T]) extends BinaryOperator[Boolean] {
+case class LessEqualOperator[T: ClassTag]()(implicit strategy: LessEqual[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = strategy.lessEqual(left.asInstanceOf[T], right.asInstanceOf[T])
   override def toString: String = "<="
   override def signature: Signature = {
@@ -213,7 +212,7 @@ class LessEqualOperator[T: ClassTag](implicit strategy: LessEqual[T]) extends Bi
 
 
 
-class GreaterOperator[T: ClassTag](implicit strategy: GreaterThan[T]) extends BinaryOperator[Boolean] {
+case class GreaterOperator[T: ClassTag]()(implicit strategy: GreaterThan[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = {
     strategy.greater(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -237,7 +236,7 @@ class GreaterOperator[T: ClassTag](implicit strategy: GreaterThan[T]) extends Bi
 
 }
 
-class GreaterEqualOperator[T: ClassTag](implicit strategy: GreaterEqual[T]) extends BinaryOperator[Boolean] {
+case class GreaterEqualOperator[T: ClassTag]()(implicit strategy: GreaterEqual[T]) extends BinaryOperator[Boolean] {
   override def eval(left: Any, right: Any): Boolean = {
     strategy.greaterEqual(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -261,7 +260,7 @@ class GreaterEqualOperator[T: ClassTag](implicit strategy: GreaterEqual[T]) exte
   }
 }
 
-class AndOperator[T: ClassTag](implicit strategy: Andable[T]) extends BinaryOperator[T] {
+case class AndOperator[T: ClassTag]()(implicit strategy: Andable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.and(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -284,7 +283,7 @@ class OrOperator[T: ClassTag](implicit strategy: Orable[T]) extends BinaryOperat
   }
 }
 
-class XorOperator[T: ClassTag](implicit strategy: Xorable[T]) extends BinaryOperator[T] {
+case class XorOperator[T: ClassTag]()(implicit strategy: Xorable[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.xor(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -297,7 +296,7 @@ class XorOperator[T: ClassTag](implicit strategy: Xorable[T]) extends BinaryOper
   }
 }
 
-class ImpliesOperator[T: ClassTag](implicit strategy: Implies[T]) extends BinaryOperator[T] {
+case class ImpliesOperator[T: ClassTag]()(implicit strategy: Implies[T]) extends BinaryOperator[T] {
   override def eval(left: Any, right: Any): T = {
     strategy.implies(left.asInstanceOf[T], right.asInstanceOf[T])
   }
@@ -312,7 +311,7 @@ class ImpliesOperator[T: ClassTag](implicit strategy: Implies[T]) extends Binary
 }
 
 
-class NotOperator[T: ClassTag](implicit strategy: NotComputable[T]) extends UnaryOperator[Boolean] {
+case class NotOperator[T: ClassTag]()(implicit strategy: NotComputable[T]) extends UnaryOperator[Boolean] {
   override def eval(expr: Any): Boolean = strategy.compute(expr.asInstanceOf[T])
 
   override def toString: String = "!"
@@ -322,7 +321,7 @@ class NotOperator[T: ClassTag](implicit strategy: NotComputable[T]) extends Unar
   )
 }
 
-class NegateOperator[T: ClassTag](implicit strategy: Negatable[T]) extends UnaryOperator[T] {
+case class NegateOperator[T: ClassTag]()(implicit strategy: Negatable[T]) extends UnaryOperator[T] {
   override def eval(expr: Any): T =  strategy.negate(expr.asInstanceOf[T])
 
   override def toString: String = "-"
@@ -332,7 +331,7 @@ class NegateOperator[T: ClassTag](implicit strategy: Negatable[T]) extends Unary
   )
 }
 
-class AbsOperator[T: ClassTag](implicit strategy: Absolutable[T]) extends UnaryOperator[T] {
+case class AbsOperator[T: ClassTag]()(implicit strategy: Absolutable[T]) extends UnaryOperator[T] {
   override def eval(expr: Any): T =  strategy.abs(expr.asInstanceOf[T])
 
   override def toString: String = "abs"
@@ -342,13 +341,13 @@ class AbsOperator[T: ClassTag](implicit strategy: Absolutable[T]) extends UnaryO
   )
 }
 
-class BoolToIntOperator[T: ClassTag, R: ClassTag](implicit strategy: BoolToIntConvertible[T, R]) extends UnaryOperator[R] {
-  override def eval(expr: Any): R = strategy.convert(expr.asInstanceOf[T])
+case class BoolToIntOperator[T: ClassTag]()(implicit strategy: BoolToIntConvertible[T]) extends UnaryOperator[Integer] {
+  override def eval(expr: Any): Integer = strategy.convert(expr.asInstanceOf[T])
 
   override def toString: String = "bool2int"
 
   override def signature: Signature = Signature(
     List(scalaTypeToExprType(classTag[T].runtimeClass)),
-    scalaTypeToExprType(classTag[R].runtimeClass)
+    scalaTypeToExprType(classOf[Integer])
   )
 }

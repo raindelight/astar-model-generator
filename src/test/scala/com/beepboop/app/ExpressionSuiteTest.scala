@@ -59,7 +59,7 @@ class ForAllExpressionSuite extends AnyFunSuite {
     val body = BinaryExpression(
       BinaryExpression(
         Variable[Integer]("i"),
-        ModOperator[Integer],
+        ModOperator[Integer](),
         Constant(2)
       ),
       EqualOperator[Integer](),

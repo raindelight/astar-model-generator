@@ -8,6 +8,7 @@ import com.beepboop.app.components.Operator
 import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.dataprovider.DataProvider
+import com.beepboop.app.logger.LogTrait
 
 sealed trait ExpressionType
 case object IntType extends ExpressionType
@@ -57,7 +58,7 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
     throw new Exception(s"Unsupported type: ${cls.getName}")
 }
 
-object ComponentRegistry {
+object ComponentRegistry extends LogTrait {
   private val binaryOperators: List[BinaryOperator[?]] = List(
     // arithmetic
     new AddOperator[Integer],
@@ -96,7 +97,7 @@ object ComponentRegistry {
     new NotOperator[Boolean](),
     new NegateOperator[Integer](),
     new AbsOperator[Integer](),
-    new BoolToIntOperator[Boolean, Integer]()
+    new BoolToIntOperator[Boolean]()
     // todo: add another unary operator
   )
 
@@ -117,12 +118,12 @@ object ComponentRegistry {
   )
 
   val creatables: List[Creatable] =
-        binaryOperators.map(BinaryExpression.asCreatable) ++
-        unaryOperators.map(UnaryExpression.asCreatable) ++
+        binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
+        unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
         allConstantFactories ++
         allVariablesFactories ++
         expressionFactories
-
+  debug(s"creatables: $creatables")
 
 
 

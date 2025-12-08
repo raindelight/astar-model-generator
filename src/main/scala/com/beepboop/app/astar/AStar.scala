@@ -12,9 +12,11 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
-import com.beepboop.app.policy.{Compliant, EnsureVarExists, NonCompliant, Scanner}
+import com.beepboop.app.policy.{Compliant, EnsureAnyVarExists, NonCompliant, Scanner}
+import com.beepboop.app.postprocessor.Postprocessor
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -130,7 +132,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
         if (!visited.contains(neighborConstraint)) {
           val h = calculateHeuristic(neighborConstraint)
           val neighbourNode = ModelNodeTMP(neighborConstraint, currentNode.g + 1, h)
-          debug(s"Enqueuing node: $neighbourNode")
+          //debug(s"Enqueuing node: $neighbourNode")
           openSet.enqueue(neighbourNode)
         }
       }
@@ -159,7 +161,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
           val context = DataProvider.createSolutionContext(i)
           val rawDist = constraint.distance(context)
 
-          // println(s"[DEBUG] Sol #$i | Constraint: $constraint | RawDist: $rawDist | Context: $context")
+          //println(s"[DEBUG] Sol #$i | Constraint: $constraint | RawDist: $rawDist | Context: $context")
 
           if (rawDist == 0) (1, 0.0)
           else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
@@ -231,14 +233,36 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val neighbors = possibleMutations.flatMap {
       case (targetNode, mutationFunc) =>
         mutationFunc(targetNode).flatMap { replacement =>
-          val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
-          val result = Scanner.visitAll(candidateTree, EnsureVarExists())
-
-          if (result.isAllowed) {
-            Some(candidateTree)
-          } else {
-            debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+          if (replacement.signature.output != targetNode.signature.output) {
+            debug(s"Type Mismatch: ${targetNode.signature.output} vs ${replacement.signature.output}")
             None
+          } else {
+            val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
+            val simplifiedTree = candidateTree match {
+              case expr: Expression[t] =>
+                implicit val tag: ClassTag[t] = expr.ct
+                Postprocessor.simplify(expr)
+            }
+            debug(s"Generated: $candidateTree to simplified $simplifiedTree")
+            val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
+            if (result.isAllowed) {
+              Profiler.recordValue("accepted", 1)
+              Some(simplifiedTree)
+            } else {
+              val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
+              debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
+              if (result.isAllowed) {
+                Profiler.recordValue("accepted", 1)
+                Some(candidateTree)
+              } else {
+                debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+                Profiler.recordValue("discarded", 1)
+                result match {
+                  case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
+                }
+                None
+              }
+            }
           }
         }
     }

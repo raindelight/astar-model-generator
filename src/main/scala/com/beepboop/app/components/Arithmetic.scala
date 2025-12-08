@@ -123,12 +123,12 @@ object Absolutable {
   }
 }
 
-trait BoolToIntConvertible[T, R] extends Serializable{
-  def convert(a: T): R
+trait BoolToIntConvertible[T] extends Serializable{
+  def convert(a: T): Integer
 }
 
 object BoolToIntConvertible {
-  implicit object BoolIsConvertible extends BoolToIntConvertible[Boolean, Integer] {
+  implicit object BoolIsConvertible extends BoolToIntConvertible[Boolean] {
     override def convert(a: Boolean): Integer = if (a) 1 else 0
   }
 }

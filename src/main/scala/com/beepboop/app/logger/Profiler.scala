@@ -7,7 +7,15 @@ import scala.jdk.CollectionConverters._
 object Profiler {
 
   private val timings = new ConcurrentHashMap[String, mutable.ListBuffer[Long]]().asScala
+  private val values = new ConcurrentHashMap[String, mutable.ListBuffer[Long]]().asScala
 
+  /**
+   * profiles the execution time of a block
+   * @param name name of the block
+   * @param block executable block, scope
+   * @tparam T return type of the block
+   * @example  profile("test") { long_func() }
+   */
   def profile[T](name: String)(block: => T): T = {
     val startTime = System.nanoTime()
 
@@ -27,8 +35,22 @@ object Profiler {
     result
   }
 
+  /**
+   * Sums given value to the variable with the name
+   * @param name name of the variable
+   * @param value value to add
+   */
+  def recordValue(name: String, value: Long): Unit = {
+    val list = values.getOrElseUpdate(name, mutable.ListBuffer.empty[Long])
+    list.synchronized {
+      list += value
+    }
+  }
+
+
   def reset(): Unit = {
     timings.clear()
+    values.clear()
   }
 
   def report(): Unit = {
@@ -37,37 +59,49 @@ object Profiler {
     val separator = "|%s|%s|%s|%s|%s|%s|"
       .format("-" * 52, "-" * 10, "-" * 16, "-" * 16, "-" * 16, "-" * 16)
 
-    def toMs(nano: Double): Double = nano / 1_000_000.0
+    def printTable(
+                    title: String,
+                    data: mutable.Map[String, mutable.ListBuffer[Long]],
+                    unitConverter: Double => Double,
+                    unitName: String
+                  ): Unit = {
+      println(s"\n--- $title ---")
+      println(headerFmt.format("Name", "Calls", s"Total ($unitName)", s"Avg ($unitName)", s"Min ($unitName)", s"Max ($unitName)"))
+      println(separator)
 
-    println("\n--- Profiler Report ---")
-    println(headerFmt.format("Function Name", "Calls", "Total (ms)", "Average (ms)", "Min (ms)", "Max (ms)"))
-    println(separator)
-
-    if (timings.isEmpty) {
-      println("| No data recorded.                                                                                      |")
-    }
-
-    val sortedTimings = timings.toSeq.sortBy(_._1)
-
-    for ((name, durations) <- sortedTimings) {
-      val (count, totalNanos, minNanos, maxNanos) = durations.synchronized {
-        if (durations.isEmpty) (0, 0L, 0L, 0L)
-        else (durations.length, durations.sum, durations.min, durations.max)
+      if (data.isEmpty) {
+        println(s"| No $title recorded.".padTo(129, ' ') + "|")
+        println(separator)
+        return
       }
 
-      if (count > 0) {
-        val avgNanos = totalNanos.toDouble / count
-        println(rowFmt.format(
-          name,
-          count,
-          toMs(totalNanos),
-          toMs(avgNanos),
-          toMs(minNanos),
-          toMs(maxNanos)
-        ))
+      val sortedData = data.toSeq.sortBy(_._1)
+
+      for ((name, records) <- sortedData) {
+        val (count, total, minVal, maxVal) = records.synchronized {
+          if (records.isEmpty) (0, 0L, 0L, 0L)
+          else (records.length, records.sum, records.min, records.max)
+        }
+
+        if (count > 0) {
+          val avg = total.toDouble / count
+          println(rowFmt.format(
+            name,
+            count,
+            unitConverter(total.toDouble),
+            unitConverter(avg),
+            unitConverter(minVal.toDouble),
+            unitConverter(maxVal.toDouble)
+          ))
+        }
       }
+      println(separator)
     }
-    println(separator)
+
+    printTable("Profiler Timings", timings, ns => ns / 1_000_000.0, "ms")
+
+    printTable("Custom Metrics", values, v => v, "val")
+
     println()
   }
 }
