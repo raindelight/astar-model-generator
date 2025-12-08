@@ -89,7 +89,7 @@ object Constant {
   }
 }
 
-case class IteratorDef[IterT](
+case class IteratorDef[IterT : ClassTag](
                              variableName: String,
                              collection: Expression[List[IterT]]
                              ) extends Expression[(String, List[IterT])] with ComposableExpression {

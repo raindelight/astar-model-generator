@@ -1,4 +1,4 @@
-import com.beepboop.app.components.{AddOperator, AllDifferentExpression, AndOperator, BinaryExpression, Constant, DivOperator, MulOperator, SubOperator, Variable}
+import com.beepboop.app.components.*
 import com.beepboop.app.postprocessor.Postprocessor
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Inspectors.*
@@ -81,6 +81,38 @@ class PostprocessorSuite extends AnyFunSuite {
 
     val expr = Postprocessor.simplify(rawExpr)
     assert(expr == Constant[Boolean](true))
+  }
+
+  test("Simplify forall with always true body") {
+    val rawExpr = ForAllExpression[Integer](
+      IteratorDef[Integer]("x", Constant[List[Integer]](List(1,2,3,4,5))),
+      BinaryExpression(
+        Constant[Integer](1),
+        EqualOperator[Integer](),
+        Constant[Integer](1)
+      )
+    )
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](true))
+
+  }
+
+
+
+  test("Simplify forall with always false body") {
+    val rawExpr = ForAllExpression[Integer](
+      IteratorDef[Integer]("x", Constant[List[Integer]](List(1,2,3,4,5))),
+      BinaryExpression(
+        Constant[Integer](1),
+        EqualOperator[Integer](),
+        Constant[Integer](2)
+      )
+    )
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](false))
+
   }
 
 }
