@@ -14,7 +14,7 @@ case class GeneratorConfig(
                             solutionsPath: Seq[String],
 
                             @arg(short = 'i', doc = "Maximum number of A* iterations")
-                            maxIterations: Int = 500,
+                            maxIterations: Int = 50,
 
                             @arg(doc = "How often to save checkpoint/CSV")
                             saveInterval: Int = 100,

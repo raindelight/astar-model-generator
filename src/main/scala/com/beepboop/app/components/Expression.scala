@@ -3,6 +3,7 @@ package com.beepboop.app.components
 import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
 
@@ -17,6 +18,9 @@ def stringWithSpaces(strings: String*): String = {
   strings.mkString(" ")
 }
 
+trait ScopeModifier {
+  def getAdditionalPolicies: List[Policy]
+}
 
 trait ComposableExpression {
   def children: List[Expression[?]]
@@ -349,7 +353,9 @@ if (allTrue) 1 else 0
 case class ForAllExpression[IterT](
                                     iteratorDef: IteratorDef[IterT], // This is now an Expression
                                     body: Expression[Boolean]
-                                  ) extends Expression[Boolean] with ComposableExpression {
+                                  ) extends Expression[Boolean]
+                                    with ComposableExpression
+                                    with ScopeModifier {
 
   override def children: List[Expression[?]] = List(iteratorDef, body)
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
@@ -358,6 +364,10 @@ case class ForAllExpression[IterT](
       iteratorDef = newChildren(0).asInstanceOf[IteratorDef[IterT]],
       body = newChildren(1).asInstanceOf[Expression[Boolean]]
     )
+  }
+
+  override def getAdditionalPolicies: List[Policy] = {
+    List(EnsureSpecificVarExists(iteratorDef.variableName))
   }
 
   override def toString: String = s"forall($iteratorDef)($body)"

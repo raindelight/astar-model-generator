@@ -12,7 +12,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
-import com.beepboop.app.policy.{Compliant, EnsureVarExists, NonCompliant, Scanner}
+import com.beepboop.app.policy.{Compliant, EnsureAnyVarExists, NonCompliant, Scanner}
 import com.beepboop.app.postprocessor.Postprocessor
 
 import scala.collection.mutable
@@ -244,16 +244,22 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
                 Postprocessor.simplify(expr)
             }
             debug(s"Generated: $candidateTree to simplified $simplifiedTree")
-            val result = Scanner.visitAll(simplifiedTree, EnsureVarExists())
+            val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
             if (result.isAllowed) {
+              Profiler.recordValue("accepted", 1)
               Some(simplifiedTree)
             } else {
-              val result = Scanner.visitAll(simplifiedTree, EnsureVarExists())
+              val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
               debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
               if (result.isAllowed) {
+                Profiler.recordValue("accepted", 1)
                 Some(candidateTree)
               } else {
                 debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+                Profiler.recordValue("discarded", 1)
+                result match {
+                  case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
+                }
                 None
               }
             }
