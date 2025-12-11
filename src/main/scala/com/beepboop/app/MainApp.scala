@@ -9,6 +9,7 @@ import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 import com.beepboop.app.dataprovider.PersistenceManager
+import debugger.VisualDebugger
 //import com.beepboop.app.utils.{GeneratorConfig, ArgumentParser}
 import com.beepboop.app.utils.ArgumentParser
 //import mainargs.{main, arg, ParserForClass, Flag}
@@ -44,6 +45,11 @@ object MainApp extends LogTrait {
       config.dataPath,
       config.solutionsPath.getOrElse("models/accap_sols_a10.csv")
     )
+    if (config.debug) {
+      info("--- Launching Visual Debugger ---")
+      VisualDebugger.launch(config.checkpointFile)
+      return;
+    }
 
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
