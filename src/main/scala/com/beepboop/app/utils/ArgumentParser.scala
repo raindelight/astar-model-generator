@@ -26,7 +26,10 @@ case class GeneratorConfig(
                             checkpointFile: String = "astar_checkpoint.bin",
 
                             @arg(short = 'r', doc = "Resume from checkpoint if exists")
-                            resume: Flag
+                            resume: Flag,
+
+                            @arg(name = "debug", short = 'd', doc = "Launch Visual Debugger GUI instead of running search")
+                            debug: Flag
                           )
 
 case class AppConfig(
@@ -37,7 +40,8 @@ case class AppConfig(
                       saveInterval: Int,
                       outputCsv: String,
                       checkpointFile: String,
-                      resume: Boolean
+                      resume: Boolean,
+                      debug: Boolean
                     )
 
 object ArgumentParser {
@@ -88,7 +92,8 @@ object ArgumentParser {
           saveInterval = cli.saveInterval,
           outputCsv = cli.outputCsv,
           checkpointFile = cli.checkpointFile,
-          resume = cli.resume.value
+          resume = cli.resume.value,
+          debug = cli.debug.value
         ))
 
       case Left(errorMsg) =>
