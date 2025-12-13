@@ -1,6 +1,6 @@
 package com.beepboop.app.policy
 
-import com.beepboop.app.components.{Expression, ComposableExpression, Variable}
+import com.beepboop.app.components.{BinaryExpression, ComposableExpression, Constant, DivOperator, Expression, Variable}
 
 sealed trait PolicyResult {
   def isAllowed: Boolean
@@ -67,5 +67,26 @@ case class EnsureSpecificVarExists(targetName: String) extends GlobalPolicy {
     }
   }
 
+
   override def isSatisfied: Boolean = found
+}
+
+case class DenyDivByZero() extends LocalPolicy {
+
+  override def message: String = s"Division by 0 is not allowed"
+
+  override def validate(node: Expression[_]): PolicyResult = node match {
+    case BinaryExpression(_, operator, rightChild) =>
+      val isDivision = operator.isInstanceOf[DivOperator[?]]
+
+      if (isDivision) {
+        rightChild match {
+          case Constant(0) => NonCompliant(node, message)
+          case _ => Compliant
+        }
+      }  else {
+        Compliant
+      }
+    case _ => Compliant
+  }
 }

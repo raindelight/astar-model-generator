@@ -107,9 +107,8 @@ trait Negatable[T] extends Serializable{
 }
 
 object Negatable {
-  implicit object IntIsNegable extends Negatable[Integer] {
+  implicit object IntIsNegatable extends Negatable[Integer] {
     override def negate(a: Integer): Integer = 0 - a
-    
   }
 }
 
