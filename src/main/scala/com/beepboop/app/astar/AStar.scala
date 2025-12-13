@@ -229,7 +229,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val constraint = node.constraint
 
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
-    //debug(possibleMutations.toString)
     val neighbors = possibleMutations.flatMap {
       case (targetNode, mutationFunc) =>
         mutationFunc(targetNode).flatMap { replacement =>
