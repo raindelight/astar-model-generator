@@ -1,8 +1,9 @@
 package com.beepboop.app.postprocessor
 
-import com.beepboop.app.components.{BinaryExpression, ComposableExpression, Constant, Expression, ForAllExpression, IteratorDef}
+import com.beepboop.app.components.*
 import com.beepboop.app.logger.LogTrait
 
+import scala.annotation.tailrec
 import scala.reflect.{ClassTag, classTag}
 
 sealed trait Rule {
@@ -47,12 +48,228 @@ case class SimplifyConstantForall() extends Rule {
   }
 }
 
+case class RemoveRedundantTrueAnd() extends Rule {
+  def condition[T: ClassTag]: (Expression[T] => Boolean) = {
+    case b: BinaryExpression[T] =>
+      val operatorIsAnd = b.operator.isInstanceOf[AndOperator[?]]
+      val oneIsTrue = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const.eval(Map.empty) match {
+              case true => true
+              case _ => false
+            }
+          case _ => false
+
+        }
+      )
+      operatorIsAnd && oneIsTrue
+    case _ => false
+  }
+
+  def action[T: ClassTag]: (Expression[T] => Expression[T]) = {
+    case b: BinaryExpression[T] => {
+      val nonConstant = b.children.filterNot(c => c.isInstanceOf[Constant[Boolean]]).head
+      nonConstant.asInstanceOf[Expression[T]]
+    }
+  }
+}
+
+
+case class RemoveRedundantFalseAnd() extends Rule {
+  def condition[T: ClassTag]: (Expression[T] => Boolean) = {
+    case b: BinaryExpression[T] =>
+      val operatorIsAnd = b.operator.isInstanceOf[AndOperator[?]]
+      val oneIsTrue = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const.eval(Map.empty) match {
+              case false => true
+              case _ => false
+            }
+          case _ => false
+
+        }
+      )
+      operatorIsAnd && oneIsTrue
+    case _ => false
+  }
+
+  def action[T: ClassTag]: (Expression[T] => Expression[T]) = {
+    case b: BinaryExpression[T] => {
+      Constant[T](false.asInstanceOf[T])
+    }
+  }
+}
+
+
+case class RemoveRedundantTrueOr() extends Rule {
+  def condition[T: ClassTag]: (Expression[T] => Boolean) = {
+    case b: BinaryExpression[T] =>
+      val operatorIsOr = b.operator.isInstanceOf[OrOperator[?]]
+      val oneIsTrue = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const.eval(Map.empty) match {
+              case true => true
+              case _ => false
+            }
+          case _ => false
+
+        }
+      )
+      operatorIsOr && oneIsTrue
+    case _ => false
+  }
+
+  def action[T: ClassTag]: (Expression[T] => Constant[T]) = {
+    case b: BinaryExpression[T] => {
+      Constant[T](true.asInstanceOf[T])
+    }
+  }
+}
+
+case class RemoveRedundantFalseOr() extends Rule {
+  def condition[T: ClassTag]: (Expression[T] => Boolean) = {
+    case b: BinaryExpression[T] =>
+      val operatorIsOr = b.operator.isInstanceOf[OrOperator[?]]
+      val oneIsTrue = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const.eval(Map.empty) match {
+              case false => true
+              case _ => false
+            }
+          case _ => false
+
+        }
+      )
+      operatorIsOr && oneIsTrue
+    case _ => false
+  }
+
+  def action[T: ClassTag]: (Expression[T] => Expression[T]) = {
+    case b: BinaryExpression[T] => {
+      val nonConstant = b.children.filterNot(c => c.isInstanceOf[Constant[Boolean]]).head
+      nonConstant.asInstanceOf[Expression[T]]
+    }
+  }
+}
+
+case class RemoveUnnecessaryAdd() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsAdd = b.operator.isInstanceOf[AddOperator[?]]
+      val zeroExists = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const eval(Map.empty) match {
+              case 0 => true
+              case _ => false
+            }
+          case _ => false
+        }
+      )
+      operatorIsAdd && zeroExists
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] => {
+      val nonConst = b.children.filterNot(c => c.isInstanceOf[Constant[?]]).head
+      nonConst.asInstanceOf[Expression[T]]
+    }
+  }
+}
+
+
+case class RemoveUnnecessarySub() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsSub = b.operator.isInstanceOf[SubOperator[?]]
+      val zeroExists = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const eval(Map.empty) match {
+              case 0 => true
+              case _ => false
+            }
+          case _ => false
+        }
+      )
+      operatorIsSub && zeroExists
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] => {
+      val child1 = b.children.head
+      val child2 = b.children.tail.head
+
+      if (child1.isInstanceOf[Constant[?]]) {
+        val op = classTag[T].runtimeClass match {
+          case c if  c == classOf[Integer] => NegateOperator[Integer]()
+          /* v based on the assumptions this shouldn't happen */
+          case _ => throw Exception("RemoveUnnecessarySub failed to assume Integer, thus attempted to create NegateOperator with unknown type")
+        }
+        UnaryExpression[T](
+          child2.asInstanceOf[Expression[T]],
+          op.asInstanceOf[UnaryOperator[T]]
+        )
+      } else {
+        child1.asInstanceOf[Expression[T]]
+      }
+    }
+  }
+}
+
+  case class RemoveUnnecessaryMult() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsMul = b.operator.isInstanceOf[MulOperator[?]]
+      val OneOrZero = b.children.exists(c =>
+        c match {
+          case const: Constant[?] =>
+            const.eval(Map.empty) match {
+              case 0 => true
+              case 1 => true
+              case _ => false
+            }
+          case _ => false
+        }
+      )
+      operatorIsMul && OneOrZero
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] => {
+      val const = b.children.filter(c => c.isInstanceOf[Constant[?]]).head
+      val nonConst = b.children.filterNot(c => c.isInstanceOf[Constant[?]]).head
+
+      const.eval(Map.empty) match {
+        case 0 => Constant[T](0.asInstanceOf[T])
+        case 1 => nonConst.asInstanceOf[Expression[T]]
+      }
+    }
+  }
+}
+
+
 object Postprocessor {
-  def availableRules = LazyList (
+  private def availableRules = LazyList (
     JoinConstants(),
-    SimplifyConstantForall()
+    SimplifyConstantForall(),
+    RemoveRedundantTrueOr(),
+    RemoveRedundantFalseOr(),
+    RemoveRedundantFalseAnd(),
+    RemoveRedundantTrueAnd(),
+    RemoveUnnecessaryMult(),
+    RemoveUnnecessaryAdd(),
+    RemoveUnnecessarySub()
   )
-  def applyAllRules[T : ClassTag](expr: Expression[T]): Expression[T] = {
+  @tailrec
+  private def applyAllRules[T : ClassTag](expr: Expression[T]): Expression[T] = {
     val distinctResult = availableRules.foldLeft(expr) { (curr, rule) =>
       if (rule.condition(curr)) rule.action(curr).asInstanceOf[Expression[T]] else curr
     }

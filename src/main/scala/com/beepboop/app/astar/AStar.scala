@@ -12,7 +12,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
-import com.beepboop.app.policy.{Compliant, EnsureAnyVarExists, NonCompliant, Scanner}
+import com.beepboop.app.policy.{Compliant, DenyDivByZero, EnsureAnyVarExists, NonCompliant, Scanner}
 import com.beepboop.app.postprocessor.Postprocessor
 
 import scala.collection.mutable
@@ -229,7 +229,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val constraint = node.constraint
 
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
-    debug(possibleMutations.toString)
     val neighbors = possibleMutations.flatMap {
       case (targetNode, mutationFunc) =>
         mutationFunc(targetNode).flatMap { replacement =>
@@ -243,25 +242,21 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
                 implicit val tag: ClassTag[t] = expr.ct
                 Postprocessor.simplify(expr)
             }
+
+
             debug(s"Generated: $candidateTree to simplified $simplifiedTree")
-            val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
+            val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
+            debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
             if (result.isAllowed) {
               Profiler.recordValue("accepted", 1)
               Some(simplifiedTree)
             } else {
-              val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists())
-              debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
-              if (result.isAllowed) {
-                Profiler.recordValue("accepted", 1)
-                Some(candidateTree)
-              } else {
-                debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
-                Profiler.recordValue("discarded", 1)
-                result match {
-                  case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
-                }
-                None
+              debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+              Profiler.recordValue("discarded", 1)
+              result match {
+                case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
               }
+              None
             }
           }
         }
