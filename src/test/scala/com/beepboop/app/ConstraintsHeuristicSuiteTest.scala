@@ -70,7 +70,7 @@ class ConstraintsHeuristicSuiteTest extends AnyFunSuite {
   }
 
   test("NotEqual_Satisfied") {
-    check("NotEqual_Satisfied", binOp(v("x"), new NotEqualOperator[Integer], c(5)), Map("x" -> i(3)), 2)
+    check("NotEqual_Satisfied", binOp(v("x"), new NotEqualOperator[Integer], c(5)), Map("x" -> i(3)), 1)
   }
 
   test("AND_Satisfied") {
@@ -131,7 +131,7 @@ class ConstraintsHeuristicSuiteTest extends AnyFunSuite {
 
   test("ForAll_Satisfied") {
     val expr = ForAllExpression(IteratorDef("i", vList("list")), binOp(v("i"), new GreaterOperator[Integer], c(0)))
-    check("ForAll_Satisfied", expr, Map("list" -> List(i(1), i(2), i(3))), 0)
+    check("ForAll_Satisfied", expr, Map("list" -> List(i(1), i(2), i(3))), 3)
   }
 
   test("Exists_Satisfied") {

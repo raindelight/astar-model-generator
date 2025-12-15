@@ -94,9 +94,9 @@ object Constant {
 }
 
 case class IteratorDef[IterT : ClassTag](
-                                          variableName: String,
-                                          collection: Expression[List[IterT]]
-                                        ) extends Expression[(String, List[IterT])] with ComposableExpression {
+                              variableName: String,
+                              collection: Expression[List[IterT]]
+                            ) extends Expression[(String, List[IterT])] with ComposableExpression {
   override def children: List[Expression[?]] = List(collection)
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
@@ -118,12 +118,12 @@ case class IteratorDef[IterT : ClassTag](
 }
 
 case class BinaryExpression[ReturnT : ClassTag](
-                                                 left: Expression[?],
-                                                 operator: BinaryOperator[ReturnT],
-                                                 right: Expression[?]
-                                               ) extends Expression[ReturnT]
-  with OperatorContainer
-  with ComposableExpression
+                                               left: Expression[?],
+                                               operator: BinaryOperator[ReturnT],
+                                               right: Expression[?]
+                                             ) extends Expression[ReturnT]
+                                              with OperatorContainer
+                                              with ComposableExpression
 {
 
   override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
@@ -196,11 +196,11 @@ object BinaryExpression {
 }
 
 case class UnaryExpression[ReturnT : ClassTag](
-                                                expr: Expression[?],
-                                                operator: UnaryOperator[ReturnT]
-                                              ) extends Expression[ReturnT]
-  with OperatorContainer
-  with ComposableExpression {
+                                        expr: Expression[?],
+                                        operator: UnaryOperator[ReturnT]
+                                      ) extends Expression[ReturnT]
+                                      with OperatorContainer
+                                      with ComposableExpression {
   override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
     case op: UnaryOperator[ReturnT] =>
       this.copy(operator = newOp.asInstanceOf[UnaryOperator[ReturnT]])
@@ -237,9 +237,9 @@ object UnaryExpression {
 }
 
 case class SumExpression[ReturnT : Numeric : ClassTag](
-                                                        expr: Expression[List[ReturnT]],
-                                                      ) extends Expression[ReturnT]
-  with ComposableExpression {
+                                              expr: Expression[List[ReturnT]],
+                                            ) extends Expression[ReturnT]
+                                            with ComposableExpression {
 
   override def children: List[Expression[?]]  = List(expr)
 
@@ -322,11 +322,11 @@ object CountExpression {
 }
 
 case class ForAllExpression[IterT](
-                                    iteratorDef: IteratorDef[IterT], // This is now an Expression
-                                    body: Expression[Boolean]
-                                  ) extends Expression[Boolean]
-  with ComposableExpression
-  with ScopeModifier {
+                            iteratorDef: IteratorDef[IterT], // This is now an Expression
+                            body: Expression[Boolean]
+                          ) extends Expression[Boolean]
+                          with ComposableExpression
+                          with ScopeModifier {
 
   override def children: List[Expression[?]] = List(iteratorDef, body)
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
