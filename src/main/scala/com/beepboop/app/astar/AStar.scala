@@ -156,28 +156,23 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       val betaSq = beta * beta
       val SCALING_FACTOR = 1000
 
-      val results = (0 until numSolutions).par.map { i =>
-        try {
-          val context = DataProvider.createSolutionContext(i)
-          val rawDist = constraint.distance(context)
-
-          //println(s"[DEBUG] Sol #$i | Constraint: $constraint | RawDist: $rawDist | Context: $context")
-
-          if (rawDist == 0) (1, 0.0)
-          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
-        } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0)
-        }
-      }
-
-      var i = 0
       val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
         try {
           val context = DataProvider.createSolutionContext(i)
-          val rawDist = constraint.distance(context)
 
-          if (rawDist == 0) (1, 0.0)
-          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+          val isSatisfied = try {
+            constraint.eval(context).asInstanceOf[Boolean]
+          } catch {
+            case _: ClassCastException => false
+            case _: Exception => false
+          }
+
+          if (isSatisfied) {
+            (1, 0.0)
+          } else {
+            val rawDist = constraint.distance(context)
+            (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+          }
         } catch {
           case scala.util.control.NonFatal(e) => (0, 1.0)
         }
@@ -194,8 +189,8 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       }
 
       val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
-      //val denominator = (betaSq * satisfactionRate) + closenessRate
       val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
+
       val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
 
       ((1.0 - fScore) * SCALING_FACTOR).toInt
