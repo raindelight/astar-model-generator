@@ -35,8 +35,8 @@ object ConstraintPicker extends LogTrait {
       val expr = tmpNode.constraint
       val tmpFile = ConstraintSaver.save(expr)
       val runner = new Runner(this.config)
-      val sol_count = runner.run(tmpFile)
-      sol_count match {
+      val solCount = runner.run(tmpFile)
+      solCount match {
         case Some(value) if (value >= threshold) => {
           val data = ConstraintData(List(expr), tmpNode.f, value)
           queue.synchronized {
@@ -77,8 +77,8 @@ object ConstraintPicker extends LogTrait {
         batchWorkload.foreach { group =>
           val tmpFile = ConstraintSaver.save(group: _*)
           val runner = new Runner(this.config)
-          val sol_count = runner.run(tmpFile)
-          sol_count match {
+          val solCount = runner.run(tmpFile)
+          solCount match {
             case Some(value) if (value >= threshold) => {
               val data = ConstraintData(group, 0.0, value)
               queue.synchronized {
