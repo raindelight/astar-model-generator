@@ -7,16 +7,10 @@ import java.nio.file.Path
 import scala.sys.process.*
 import spray.json.*
 import DefaultJsonProtocol.*
+import com.beepboop.app.logger.{LogTrait, Profiler}
 
-class Runner(config: AppConfig) {
-  def run(path: Path): Long = {
-
-
-    val test_command = Seq(
-      "pwd"
-    )
-    println(test_command.!!)
-
+class Runner(config: AppConfig) extends LogTrait {
+  def run(path: Path): Option[Long] = {
     val currentWorkingDir = System.getProperty("user.dir")
 
     val command = Seq(
@@ -31,7 +25,7 @@ class Runner(config: AppConfig) {
       path.toAbsolutePath.toString,
       config.dataPath
     )
-    println(command.mkString(" "))
+    debug(s"Running: ${command.mkString(" ")}")
 
     val stdout = new StringBuilder
     val stderr = new StringBuilder
@@ -40,20 +34,21 @@ class Runner(config: AppConfig) {
 
     if (status == 0) {
       val parsedOutput = stdout.toString().replace("}{", "}\n{").split("\n")
-      println(parsedOutput.head)
+      debug(s"Output head: ${parsedOutput.head}")
       val jsonObjects = parsedOutput.map(o => o.parseJson.asJsObject)
-
 
       val count = jsonObjects.count(j => j.fields.get("output") match {
         case Some(jsValue) => true
-        case None => false
+        case None =>  {
+          Profiler.recordValue("Invalid mzn", 1)
+          false
+        }
       })
-      println(count)
-      count
+      Some(count)
     } else {
-      println(stdout)
-      println(stderr)
-      0
+      debug(stdout.toString)
+      debug(stderr.toString)
+      None
     }
   }
 }
