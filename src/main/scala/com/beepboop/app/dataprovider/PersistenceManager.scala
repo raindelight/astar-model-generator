@@ -2,9 +2,12 @@ package com.beepboop.app.dataprovider
 
 import com.beepboop.app.astar.ModelNodeTMP
 import com.beepboop.app.components.Expression
+import com.beepboop.app.cpicker.ConstraintData
 import com.beepboop.app.logger.LogTrait
-import java.io._
-import scala.util.{Try, Success, Failure}
+
+import java.io.*
+import scala.annotation.targetName
+import scala.util.{Failure, Success, Try}
 
 case class AStarSnapshot(
                           openSetItems: List[ModelNodeTMP],
@@ -12,6 +15,29 @@ case class AStarSnapshot(
                         ) extends Serializable
 
 object PersistenceManager extends LogTrait {
+
+  @targetName("ConstraintData")
+  def saveConstraintsToCSV(cd: Iterable[ConstraintData], filename: String): Unit = {
+    val file = new File(filename)
+    Option(file.getParentFile).foreach(_.mkdirs())
+    val bw = new BufferedWriter(new FileWriter(file))
+    try {
+      bw.write("Constraint_String|Score_f|Sol_count\n")
+
+      cd.foreach { c =>
+        val cleanStr = c.constraint.toString.replaceAll("[\r\n]+", " ")
+        bw.write(s"$cleanStr|${c.heuristics}|${c.sol_count}\n")
+      }
+      info(s"Saved ${cd.size} solutions to CSV: $filename")
+    } catch {
+      case e: Exception => error(s"Error writing CSV: ${e.getMessage}")
+    } finally {
+      bw.close()
+    }
+
+  }
+
+  @targetName("ModelNodeTMP")
   def saveConstraintsToCSV(nodes: Iterable[ModelNodeTMP], filename: String): Unit = {
     val file = new File(filename)
     Option(file.getParentFile).foreach(_.mkdirs())
