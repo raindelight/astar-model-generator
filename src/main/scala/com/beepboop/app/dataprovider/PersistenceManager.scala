@@ -26,7 +26,7 @@ object PersistenceManager extends LogTrait {
 
       cd.foreach { c =>
         val cleanStr = c.constraint.toString.replaceAll("[\r\n]+", " ")
-        bw.write(s"$cleanStr|${c.heuristics}|${c.sol_count}\n")
+        bw.write(s"$cleanStr|${c.heuristics}|${c.solCount}\n")
       }
       info(s"Saved ${cd.size} solutions to CSV: $filename")
     } catch {

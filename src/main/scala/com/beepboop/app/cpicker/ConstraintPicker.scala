@@ -8,10 +8,8 @@ import com.beepboop.app.utils.AppConfig
 
 import scala.collection.parallel.CollectionConverters.*
 import scala.collection.mutable
-import scala.collection.mutable
-import scala.collection.parallel.CollectionConverters.*
 
-case class ConstraintData(constraint: List[Expression[?]], heuristics: Double, sol_count: Long)
+case class ConstraintData(constraint: List[Expression[?]], heuristics: Double, solCount: Long)
 
 object ExpressionOrdering extends Ordering[Expression[?]] {
   def compare(x: Expression[?], y: Expression[?]): Int = x.toString.compareTo(y.toString)
@@ -24,7 +22,7 @@ object ConstraintPicker extends LogTrait {
     this.config = config
   }
 
-  private def order(item: ConstraintData) = -item.sol_count
+  private def order(item: ConstraintData) = -item.solCount
 
   var queue: mutable.PriorityQueue[ConstraintData] = mutable.PriorityQueue[ConstraintData]()(Ordering.by(order))
 
@@ -59,7 +57,7 @@ object ConstraintPicker extends LogTrait {
 
     val baseExpressions = validSingles.toList
     var currentRoundGroups = round1Results
-      .sortBy(_.sol_count)
+      .sortBy(_.solCount)
       .take((round1Results.size * keepRatio).toInt.max(1))
       .map(_.constraint)
       .toList
@@ -96,7 +94,7 @@ object ConstraintPicker extends LogTrait {
         }
 
         currentRoundGroups = roundResults
-          .sortBy(_.sol_count)
+          .sortBy(_.solCount)
           .take((roundResults.size * Math.pow(keepRatio, round)).toInt.max(1))
           .map(_.constraint)
           .toList
