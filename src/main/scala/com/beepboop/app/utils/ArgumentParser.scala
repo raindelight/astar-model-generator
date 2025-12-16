@@ -31,7 +31,7 @@ case class GeneratorConfig(
                             @arg(name = "debug", short = 'd', doc = "Launch Visual Debugger GUI instead of running search")
                             debug: Flag,
 
-                            @arg(name = "gurobi_license", doc = "Path to gurobi license file")
+                            @arg(name = "gurobi-license", doc = "Path to gurobi license file")
                             gurobiLicense: String = ""
                           )
 
