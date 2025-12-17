@@ -75,6 +75,20 @@ which compiles the project every time when running.
 - `--out <path>`: Path to save the constraints at each save interval and the end.
 - `--checkpoint <path>`: Path to save/load the search checkpoint binary file.
 - `--resume`: Resume from the checkpoint file specified by `--checkpoint`.
+- `--gurobi-license`: Path to gurobi license (`.lic`) file required by constraint picking
+
+
+### Example arguments
+```bash
+sbt "run
+models/mznc2024_probs/accap/accap.mzn
+models/mznc2024_probs/accap/accap_a10_f80_t50.json
+-s models/accap_sols_a10.csv
+-i 50
+--gurobi-license $HOME/development/gurobi.lic
+"
+
+```
 
 ## License
 This project is licensed under the *MIT License*. See [LICENSE](LICENSE) file for details.

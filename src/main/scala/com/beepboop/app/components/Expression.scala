@@ -94,9 +94,9 @@ object Constant {
 }
 
 case class IteratorDef[IterT : ClassTag](
-                             variableName: String,
-                             collection: Expression[List[IterT]]
-                             ) extends Expression[(String, List[IterT])] with ComposableExpression {
+                              variableName: String,
+                              collection: Expression[List[IterT]]
+                            ) extends Expression[(String, List[IterT])] with ComposableExpression {
   override def children: List[Expression[?]] = List(collection)
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
@@ -118,13 +118,13 @@ case class IteratorDef[IterT : ClassTag](
 }
 
 case class BinaryExpression[ReturnT : ClassTag](
-                                      left: Expression[?],
-                                      operator: BinaryOperator[ReturnT],
-                                      right: Expression[?]
-                                    ) extends Expression[ReturnT]
-                                      with OperatorContainer
-                                      with ComposableExpression
-                                      {
+                                               left: Expression[?],
+                                               operator: BinaryOperator[ReturnT],
+                                               right: Expression[?]
+                                             ) extends Expression[ReturnT]
+                                              with OperatorContainer
+                                              with ComposableExpression
+{
 
   override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
     case op: BinaryOperator[?] =>
@@ -167,6 +167,8 @@ case class BinaryExpression[ReturnT : ClassTag](
         left.distance(context) + right.distance(context)
       case _: OrOperator[_] =>
         Math.min(left.distance(context), right.distance(context))
+      case _: ImpliesOperator[_] =>
+        if (left.eval(context).asInstanceOf[Boolean]) right.distance(context) else 0
       case _ =>
         operator.distance(left.eval(context), right.eval(context))
     }
@@ -194,9 +196,9 @@ object BinaryExpression {
 }
 
 case class UnaryExpression[ReturnT : ClassTag](
-                                   expr: Expression[?],
-                                   operator: UnaryOperator[ReturnT]
-                                   ) extends Expression[ReturnT]
+                                        expr: Expression[?],
+                                        operator: UnaryOperator[ReturnT]
+                                      ) extends Expression[ReturnT]
                                       with OperatorContainer
                                       with ComposableExpression {
   override def withNewOperator(newOp: Operator[?]): Expression[?] = newOp match {
@@ -234,31 +236,10 @@ object UnaryExpression {
   }
 }
 
-/*
-  Count ( expr: Expression[List[Any]] ) extends Expression [ReturnT]
-  - has expression -> should extend ComposableExpression
-    - children -> List(expr)
-    - withNewChildren -> how it should replace arguments to his children
-  - toString -> similiar to sumExpression |  count(listA)
-  - evalToString ->  count([2,3,4,5])
-  - eval(context)  expr(context).length
-  - signature - input list
-    outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
-
-object CountExpression
-  def asCreatable(List(Expr // similiar to SumExpression
-
-  CountExpression[Integer](child) <- expr
-*/
-
-
-
-
-
 case class SumExpression[ReturnT : Numeric : ClassTag](
-                expr: Expression[List[ReturnT]],
-              ) extends Expression[ReturnT]
-              with ComposableExpression {
+                                              expr: Expression[List[ReturnT]],
+                                            ) extends Expression[ReturnT]
+                                            with ComposableExpression {
 
   override def children: List[Expression[?]]  = List(expr)
 
@@ -340,22 +321,12 @@ object CountExpression {
   }
 }
 
-/*
-case Forall(variableName, start, end, body)
-=>
-val allTrue = (start to end).forall { i =>
-  val newSolution = solution + (variableName -> i)
-  eval(body, newSolution) != 0
-}
-if (allTrue) 1 else 0
-*/
-
 case class ForAllExpression[IterT](
-                                    iteratorDef: IteratorDef[IterT], // This is now an Expression
-                                    body: Expression[Boolean]
-                                  ) extends Expression[Boolean]
-                                    with ComposableExpression
-                                    with ScopeModifier {
+                            iteratorDef: IteratorDef[IterT], // This is now an Expression
+                            body: Expression[Boolean]
+                          ) extends Expression[Boolean]
+                          with ComposableExpression
+                          with ScopeModifier {
 
   override def children: List[Expression[?]] = List(iteratorDef, body)
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
@@ -378,6 +349,11 @@ case class ForAllExpression[IterT](
     itemsToIterate.forall { item =>
       body.eval(context.+(variableName -> item))
     }
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    val (variableName, itemsToIterate) = iteratorDef.eval(context)
+    itemsToIterate.map(item => body.distance(context.+(variableName -> item))).sum
   }
 
   override def signature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
@@ -434,6 +410,11 @@ case class ExistsExpression[IterT](
     itemsToIterate.exists { item =>
       body.eval(context.+(variableName -> item))
     }
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    val (variableName, itemsToIterate) = iteratorDef.eval(context)
+    if (itemsToIterate.isEmpty) 1 else itemsToIterate.map(item => body.distance(context.+(variableName -> item))).min
   }
 
   override def signature: Signature = Signature(inputs = List(ListAnyType, BoolType), output = BoolType)
@@ -509,7 +490,7 @@ object AllDifferentExpression {
     }
   }
 }
-/* todo: check this code
+
 case class LexicographicalExpression[T : Ordering : ClassTag](
                                                                leftExpr: Expression[List[T]],
                                                                operator: BinaryOperator[Boolean],
@@ -535,15 +516,15 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
     )
   }
 
- 
+
   override def toString: String = {
     val leftStr = leftExpr.toString
     val rightStr = rightExpr.toString
-    
+
     operator.toString match {
       case "<" => s"lex_less($leftStr, $rightStr)"
       case "<=" => s"lex_leq($leftStr, $rightStr)"
-      case ">" => s"lex_greater($leftStr, $rightStr)" 
+      case ">" => s"lex_greater($leftStr, $rightStr)"
       case ">=" => s"lex_greatereq($leftStr, $rightStr)"
       case "="  => s"$leftStr = $rightStr"
       case _ => throw new UnsupportedOperationException(s"Unsupported Lexicographical operator for export: ${operator.toString}")
@@ -570,10 +551,34 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
     val rightList = rightExpr.eval(context)
 
     implicit val ordering: Ordering[List[T]] = Ordering.Implicits.seqOrdering
-    val comparisonResult = ordering.compare(leftList, rightList)
+    val res = ordering.compare(leftList, rightList)
 
+    operator match {
+      case _: LessOperator[_] => res < 0
+      case _: LessEqualOperator[_] => res <= 0
+      case _: GreaterOperator[_] => res > 0
+      case _: GreaterEqualOperator[_] => res >= 0
+      case _: EqualOperator[_] => res == 0
+      case _: NotEqualOperator[_] => res != 0
+      case _ => false
+    }
+  }
 
-    operator.eval(comparisonResult, 0)
+  override def distance(context: Map[String, Any]): Int = {
+    if (eval(context)) return 0
+    val leftList = leftExpr.eval(context)
+    val rightList = rightExpr.eval(context)
+
+    val pairs = leftList.zip(rightList)
+    val idx = pairs.indexWhere { case (a, b) => a != b }
+
+    if (idx == -1) {
+      if (leftList.length != rightList.length) 1 else 0
+    } else {
+      val a = leftList(idx)
+      val b = rightList(idx)
+      operator.distance(a, b)
+    }
   }
 
   override def signature: Signature = {
@@ -585,22 +590,22 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
 object LexicographicalExpression {
   def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable {
     override def templateSignature: Signature = op.signature
-    override def create(operator: BinaryOperator[Boolean], children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 2, "LexicographicalExpression.create requires two children.")
 
       val left = children(0).asInstanceOf[Expression[List[Integer]]]
       val right = children(1).asInstanceOf[Expression[List[Integer]]]
 
 
-      LexicographicalExpression[Integer](left, operator, right)
+      LexicographicalExpression[Integer](left, op, right)
     }
   }
 }
-*/
+
 
 case class MinimumExpression[ReturnT : Numeric : ClassTag](
-                              elements: Expression[List[ReturnT]]
-                            ) extends Expression[ReturnT]
+                                                            elements: Expression[List[ReturnT]]
+                                                          ) extends Expression[ReturnT]
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(elements)
@@ -620,7 +625,7 @@ case class MinimumExpression[ReturnT : Numeric : ClassTag](
     val numeric = implicitly[Numeric[ReturnT]]
     evaluatedList.min(numeric)
   }
-  
+
   override def signature: Signature = {
     val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
     val outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
@@ -643,8 +648,8 @@ object MinimumExpression {
 }
 
 case class MaximumExpression[ReturnT : Numeric : ClassTag](
-                              elements: Expression[List[ReturnT]]
-                            ) extends Expression[ReturnT]
+                                                            elements: Expression[List[ReturnT]]
+                                                          ) extends Expression[ReturnT]
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(elements)
@@ -700,7 +705,7 @@ case class Task(
     s"Task(${start.evalToString}, ${duration.evalToString}, ${demand.evalToString})"
 }
 
-/* todo: check this code
+
 case class CumulativeExpression(
                                  tasks: Expression[List[Task]],
                                  operator: BinaryOperator[Boolean],
@@ -737,6 +742,8 @@ case class CumulativeExpression(
     val taskList = tasks.eval(context)
     val cap = limit.eval(context).intValue()
 
+    if (taskList.isEmpty) return true
+
     val evaluatedTasks = taskList.map { task =>
       (
         task.start.eval(context).intValue(),
@@ -745,14 +752,12 @@ case class CumulativeExpression(
       )
     }
 
-    if (evaluatedTasks.isEmpty) return true
-
     val s = evaluatedTasks.map(_._1)
 
     val minStart: Int = s.min
     val maxEnd: Int = evaluatedTasks.map { case (start, duration, _) => start + duration }.max
 
-    (minStart to maxEnd).forall { time =>
+    (minStart until maxEnd).forall { time =>
       val currentLoad = evaluatedTasks.filter { case (start, duration, _) =>
         time >= start && time < start + duration
       }.map { case (_, _, demand) => demand }.sum
@@ -768,6 +773,8 @@ case class CumulativeExpression(
     val taskList = tasks.eval(context)
     val cap = limit.eval(context).intValue()
 
+    if (taskList.isEmpty) return 0
+
     val evaluatedTasks = taskList.map { task =>
       (
         task.start.eval(context).intValue(),
@@ -776,19 +783,17 @@ case class CumulativeExpression(
       )
     }
 
-    if (evaluatedTasks.isEmpty) return 0
-
     val s = evaluatedTasks.map(_._1)
     val minStart: Int = s.min
     val maxEnd: Int = evaluatedTasks.map { case (start, duration, _) => start + duration }.max
 
 
-    (minStart to maxEnd).map { time =>
+    (minStart until maxEnd).map { time =>
       val currentLoad = evaluatedTasks.filter { case (start, duration, _) =>
         time >= start && time < start + duration
       }.map { case (_, _, demand) => demand }.sum
 
-      Math.max(0, currentLoad - cap)
+      operator.distance(currentLoad, cap)
     }.sum
   }
 
@@ -809,19 +814,17 @@ object CumulativeExpression {
         output = BoolType
       )
 
-    override def create(operator: BinaryOperator[Boolean], children: List[Expression[?]]): Expression[?] = {
+    override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 2, "CumulativeExpression.create requires two children (Task list, limit).")
 
       val tasksExpr = children(0).asInstanceOf[Expression[List[Task]]]
       val limitExpr = children(1).asInstanceOf[Expression[Integer]]
 
 
-      CumulativeExpression(tasksExpr, operator, limitExpr)
+      CumulativeExpression(tasksExpr, op, limitExpr)
     }
   }
 }
-
-*/
 
 
 case class GlobalCardinalityExpression(
@@ -857,7 +860,7 @@ case class GlobalCardinalityExpression(
 
 
     requiredCounts.forall { case (value, requiredCount) =>
-           val actualCount = actualFrequencies.getOrElse(value, 0)
+      val actualCount = actualFrequencies.getOrElse(value, 0)
 
       actualCount == requiredCount.intValue()
     }
@@ -970,24 +973,19 @@ case class DiffnExpression(
 
   override def distance(context: Map[String, Any]): Int = {
     val rects = rectsExpr.eval(context)
-    val evaluatedRects = rects.map { rect =>
-      (
-        rect.x.eval(context).intValue(),
-        rect.y.eval(context).intValue(),
-        rect.width.eval(context).intValue(),
-        rect.height.eval(context).intValue()
-      )
-    }
+    val evaluatedRects = rects.map { r => (r.x.eval(context).intValue(), r.y.eval(context).intValue(), r.width.eval(context).intValue(), r.height.eval(context).intValue()) }
 
-    evaluatedRects.combinations(2).count {
-      case List((x1, y1, dx1, dy1), (x2, y2, dx2, dy2)) =>
+    evaluatedRects.combinations(2).map {
+      case List((x1, y1, w1, h1), (x2, y2, w2, h2)) =>
+        val xOverlap = Math.max(0, Math.min(x1 + w1, x2 + w2) - Math.max(x1, x2))
+        val yOverlap = Math.max(0, Math.min(y1 + h1, y2 + h2) - Math.max(y1, y2))
 
-        val overlapX = (x1 < x2 + dx2) && (x2 < x1 + dx1)
-
-        val overlapY = (y1 < y2 + dy2) && (y2 < y1 + dy1)
-
-        overlapX && overlapY
-    }
+        if (xOverlap > 0 && yOverlap > 0) {
+          Math.min(xOverlap, yOverlap)
+        } else {
+          0
+        }
+    }.sum
   }
 
   override def signature: Signature = {
@@ -1038,7 +1036,7 @@ case class ValuePrecedesChainExpression(
     s"value_precede_chain(${variablesExpr.toString}, ${valuesToPrecedeExpr.toString})"
 
   override def evalToString: String = {
-       val variablesStr = variablesExpr.evalToString
+    val variablesStr = variablesExpr.evalToString
     val valuesStr = valuesToPrecedeExpr.evalToString
     s"value_precede_chain($variablesStr, $valuesStr)"
   }
@@ -1096,7 +1094,7 @@ case class ValuePrecedesChainExpression(
 
         (lastAIndex, firstBIndex) match {
           case (Some(lastA), Some(firstB)) =>
-            Math.max(0, lastA - firstB + 1)
+            if (lastA >= firstB) lastA - firstB + 1 else 0
 
           case _ => 0
         }
@@ -1135,8 +1133,8 @@ object ValuePrecedesChainExpression {
 
 
 case class RedundantConstraint[T : ClassTag](
-                                   innerConstraint: Expression[T]
-                                 ) extends Expression[T]
+                                              innerConstraint: Expression[T]
+                                            ) extends Expression[T]
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(innerConstraint)

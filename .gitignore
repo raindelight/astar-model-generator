@@ -1,5 +1,10 @@
 *.class
 *.log
+astar_checkpoint.bin
+*.bin
+generated_constraints.csv
+queue.csv
+gurobi.log
 
 hs_err_pid*
 dist/*

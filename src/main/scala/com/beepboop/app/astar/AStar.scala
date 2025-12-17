@@ -157,21 +157,17 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(resultNodes)
   }
 
-  /**
-   * Główna metoda heurystyki.
-   * Odpowiedzialna za zebranie danych (uruchomienie eval/distance na rozwiązaniach)
-   * i przekazanie ich do metody obliczającej wynik.
-   */
   private def calculateHeuristic(constraint: Expression[?]): Int = {
     Profiler.profile("calculateHeuristic") {
       if (numSolutions == 0) return Int.MaxValue
 
-      // KROK 1: Zbieranie surowych danych (równolegle)
+      val beta = 2.0
+      val betaSq = beta * beta
+      val SCALING_FACTOR = 1000
+
       val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
         try {
           val context = DataProvider.createSolutionContext(i)
-
-          // Sprawdzamy spełnienie za pomocą eval()
           val isSatisfied = try {
             constraint.eval(context).asInstanceOf[Boolean]
           } catch {
@@ -182,7 +178,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
           if (isSatisfied) {
             (1, 0.0) // Spełnione: count=1, distance=0.0
           } else {
-            // Niespełnione: count=0, distance=znormalizowany rawDist
             val rawDist = constraint.distance(context)
             (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
           }
@@ -192,20 +187,12 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       }.fold((0, 0.0)) { (acc, elem) =>
         (acc._1 + elem._1, acc._2 + elem._2)
       }
-
-      // KROK 2: Utworzenie obiektu statystyk
       val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, numSolutions)
 
-      // KROK 3: Obliczenie finalnej wartości heurystyki
       computeHeuristicScore(stats)
     }
   }
 
-  /**
-   * Metoda czysto obliczeniowa.
-   * Zamienia surowe statystyki na wartość liczbową (koszt) dla algorytmu A*.
-   * To tutaj można testować różne wzory na F-score.
-   */
   private def computeHeuristicScore(stats: HeuristicStats): Int = {
     val beta = 2.0
     val betaSq = beta * beta
@@ -215,18 +202,15 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val avgNormDist = stats.totalNormalizedDistance / stats.numSolutions.toDouble
     val closenessRate = 1.0 - avgNormDist
 
-    // Warunek brzegowy: brak spełnień i maksymalny dystans
     if (satisfactionRate == 0.0 && closenessRate == 0.0) {
       return SCALING_FACTOR
     }
 
-    // Obliczanie F-score (beta=2 promuje satisfactionRate)
     val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
     val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
 
     val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
 
-    // Odwracamy F-score, aby uzyskać koszt (im wyższy F-score, tym niższy koszt)
     ((1.0 - fScore) * SCALING_FACTOR).toInt
   }
 
