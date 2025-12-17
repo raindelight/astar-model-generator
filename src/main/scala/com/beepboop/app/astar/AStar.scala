@@ -42,6 +42,7 @@ case class ModelNodeTMP(
 case class HeuristicStats(
                            satisfiedCount: Int,
                            totalNormalizedDistance: Double,
+                           minNormalizedDistance: Double,
                            numSolutions: Int
                          )
 
@@ -157,13 +158,10 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Profiler.profile("calculateHeuristic") {
       if (numSolutions == 0) return Int.MaxValue
 
-      val beta = 2.0
-      val betaSq = beta * beta
-      val SCALING_FACTOR = 1000
-
-      val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
+      val (satisfiedCount, totalNormalizedDistance, minNormalizedDistance) = (0 until numSolutions).par.map { i =>
         try {
           val context = DataProvider.createSolutionContext(i)
+
           val isSatisfied = try {
             constraint.eval(context).asInstanceOf[Boolean]
           } catch {
@@ -172,20 +170,25 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
           }
 
           if (isSatisfied) {
-            (1, 0.0)
+            (1, 0.0, 0.0)
           } else {
             val rawDist = constraint.distance(context)
-            (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+            val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
+            (0, normDist, normDist)
           }
         } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0)
+          case scala.util.control.NonFatal(e) => (0, 1.0, 1.0)
         }
-      }.fold((0, 0.0)) { (acc, elem) =>
-        (acc._1 + elem._1, acc._2 + elem._2)
+      }.fold((0, 0.0, 1.0)) { (acc, elem) =>
+        (
+          acc._1 + elem._1,
+          acc._2 + elem._2,
+          math.min(acc._3, elem._3)
+        )
       }
-      val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, numSolutions)
 
-      computeHeuristicScore(stats)
+      val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, minNormalizedDistance, numSolutions)
+      computeHeuristicScoreMinDist(stats)
     }
   }
 
@@ -206,7 +209,26 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
 
     val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
+  }
 
+  private def computeHeuristicScoreMinDist(stats: HeuristicStats): Int = {
+    val beta = 2.0
+    val betaSq = beta * beta
+    val SCALING_FACTOR = 1000
+
+    val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
+
+    val closenessRate = 1.0 - stats.minNormalizedDistance
+
+    if (satisfactionRate == 0.0 && closenessRate == 0.0) {
+      return SCALING_FACTOR
+    }
+
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
+
+    val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
     ((1.0 - fScore) * SCALING_FACTOR).toInt
   }
 
