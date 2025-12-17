@@ -358,4 +358,121 @@ class PostprocessorSuite extends AnyFunSuite {
     ))
   }
 
+  test("Dividing same variables should return 1 | VarDivToOne") {
+    val rawExpr = BinaryExpression[Integer](
+      Variable[Integer]("x"),
+      DivOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Integer](1))
+  }
+
+
+
+  test("Dividing same n*x / x should return n | VarDivToN") {
+    val rawExpr = BinaryExpression[Integer](
+      BinaryExpression[Integer](
+        Constant[Integer](3),
+        MulOperator[Integer](),
+        Variable[Integer]("x")
+      ),
+      DivOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Integer](3))
+  }
+
+  test("Subtracting x - x should return 0 | SubVarsToZero") {
+    val rawExpr = BinaryExpression[Integer](
+      Variable[Integer]("x"),
+      SubOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Integer](0))
+  }
+
+  test("Var equals Var should return true | EqualityToTrue") {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      EqualOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](true))
+  }
+
+  test("Var >= Var should return true | EqualityToTrue") {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      GreaterEqualOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](true))
+  }
+  test("Var <= Var should return true | EqualityToTrue") {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      LessEqualOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](true))
+  }
+
+  test("Var < Var should return false | NonEqualityToFalse")  {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      LessOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](false))
+
+  }
+
+  test("Var > Var should return false | NonEqualityToFalse")  {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      GreaterOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](false))
+
+  }
+
+
+
+  test("Var != Var should return false | NonEqualityToFalse")  {
+    val rawExpr = BinaryExpression[Boolean](
+      Variable[Integer]("x"),
+      NotEqualOperator[Integer](),
+      Variable[Integer]("x")
+    )
+
+    val expr = Postprocessor.simplify(rawExpr)
+
+    assert(expr == Constant[Boolean](false))
+
+  }
 }
