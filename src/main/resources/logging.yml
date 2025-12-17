@@ -92,3 +92,12 @@ com.beepboop.app.components.ComponentRegistry:
 com.beepboop.app.postprocessor.JoinConstants:
   level: DEBUG
   enabled: false
+
+com.beepboop.app.cpicker.Runner:
+  level: INFO
+  enabled: true
+
+
+com.beepboop.app.cpicker.ConstraintPicker:
+  level: INFO
+  enabled: true

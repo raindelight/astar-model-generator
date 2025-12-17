@@ -89,8 +89,8 @@ object ComponentRegistry extends LogTrait {
     new XorOperator[Boolean],
     new ImpliesOperator[Boolean],
 
-    new ContainsOperator[List[Integer], Integer],
-    new ContainsOperator[Set[Int], Int]
+    // new ContainsOperator[List[Integer], Integer],
+    // new ContainsOperator[Set[Int], Int]
   )
 
   private val unaryOperators: List[UnaryOperator[?]] = List(

@@ -29,7 +29,10 @@ case class GeneratorConfig(
                             resume: Flag,
 
                             @arg(name = "debug", short = 'd', doc = "Launch Visual Debugger GUI instead of running search")
-                            debug: Flag
+                            debug: Flag,
+
+                            @arg(name = "gurobi-license", doc = "Path to gurobi license file")
+                            gurobiLicense: String = ""
                           )
 
 case class AppConfig(
@@ -41,7 +44,8 @@ case class AppConfig(
                       outputCsv: String,
                       checkpointFile: String,
                       resume: Boolean,
-                      debug: Boolean
+                      debug: Boolean,
+                      gurobiLicense: String
                     )
 
 object ArgumentParser {
@@ -93,7 +97,8 @@ object ArgumentParser {
           outputCsv = cli.outputCsv,
           checkpointFile = cli.checkpointFile,
           resume = cli.resume.value,
-          debug = cli.debug.value
+          debug = cli.debug.value,
+          gurobiLicense = cli.gurobiLicense
         ))
 
       case Left(errorMsg) =>

@@ -1,0 +1,9 @@
+{
+    "--gurobi-PoolGap": 1000,
+    "--gurobi-PoolSearchMode": 2,
+    "--gurobi-PoolSolutions": 147483646,
+    "--gurobi-Heuristics": 1,
+    "-O": 2,
+    "output-objective": true,
+    "intermediate-solutions": true
+}

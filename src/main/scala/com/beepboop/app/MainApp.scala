@@ -1,7 +1,8 @@
 package com.beepboop.app
 
 import com.beepboop.app.astar.AStar
-import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, Variable}
+import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, GreaterOperator, Variable}
+import com.beepboop.app.cpicker.{ConstraintPicker, ConstraintSaver, Runner}
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.Profiler
 import com.beepboop.app.mutations.{AllMutations, ExpressionGenerator, MutationEngine}
@@ -9,6 +10,7 @@ import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 import com.beepboop.app.dataprovider.PersistenceManager
+import com.beepboop.app.utils.AppConfig
 import debugger.VisualDebugger
 //import com.beepboop.app.utils.{GeneratorConfig, ArgumentParser}
 import com.beepboop.app.utils.ArgumentParser
@@ -94,25 +96,21 @@ object MainApp extends LogTrait {
       PersistenceManager.saveConstraintsToCSV(nodes, config.outputCsv)
     }
 
+
+    info("--- Step 4. Starting constraint picking ---")
+
+    ConstraintSaver.setConfig(config)
+
+    ConstraintPicker.setConfig(config)
+    /* vvv comment if no gurobi license present vvv */
+    ConstraintPicker.runInitial(result.get)
+
+
+
+
     Profiler.report()
     Profiler.reset()
-    /*
-    var mutatedExpression = initialExpression
 
-
-    info(s"0 Original Expression: ${initialExpression}")
-    for(no <- 0 to 10) {
-      mutatedExpression = mutationEngine.mutate(mutatedExpression)
-      info(s"$no Mutated Expression: ${mutatedExpression}")
-      var satisfied = 0
-
-      for(i <- 0 to 5000 - 1){
-        val context = DataProvider.createSolutionContext(i)
-        if(mutatedExpression.eval(context) == true) satisfied += 1
-      }
-      info(s"$no Satisfied $satisfied / 5000 (${(satisfied/5000)*100}%)")
-    }
-  */
 
 
 
