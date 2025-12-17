@@ -172,7 +172,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
           }
 
           if (isSatisfied) {
-            (1, 0.0) // Spełnione: count=1, distance=0.0
+            (1, 0.0)
           } else {
             val rawDist = constraint.distance(context)
             (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
