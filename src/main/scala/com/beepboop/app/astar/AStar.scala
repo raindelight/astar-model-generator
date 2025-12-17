@@ -39,6 +39,16 @@ case class ModelNodeTMP(
   val f: Int = g + h
 }
 
+/**
+ * Struktura przechowująca surowe statystyki o dopasowaniu ograniczenia do zbioru rozwiązań.
+ * Używana do oddzielenia procesu zbierania danych od algorytmu obliczania oceny heurystycznej.
+ */
+case class HeuristicStats(
+                           satisfiedCount: Int,
+                           totalNormalizedDistance: Double,
+                           numSolutions: Int
+                         )
+
 object ModelNodeOrdering extends Ordering[ModelNode] {
   def compare(a: ModelNode, b: ModelNode): Int = b.f.compare(a.f)
 }
@@ -79,7 +89,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     this.openSet.clear()
     this.visited.clear()
     snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
-    
+
     snapshot.visitedItems.foreach(node => visited(node.constraint) = node)
 
     this.isInitialized = true
@@ -147,59 +157,77 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(resultNodes)
   }
 
+  /**
+   * Główna metoda heurystyki.
+   * Odpowiedzialna za zebranie danych (uruchomienie eval/distance na rozwiązaniach)
+   * i przekazanie ich do metody obliczającej wynik.
+   */
   private def calculateHeuristic(constraint: Expression[?]): Int = {
-
     Profiler.profile("calculateHeuristic") {
       if (numSolutions == 0) return Int.MaxValue
 
-      val beta = 2.0
-      val betaSq = beta * beta
-      val SCALING_FACTOR = 1000
-
-      val results = (0 until numSolutions).par.map { i =>
-        try {
-          val context = DataProvider.createSolutionContext(i)
-          val rawDist = constraint.distance(context)
-
-          //println(s"[DEBUG] Sol #$i | Constraint: $constraint | RawDist: $rawDist | Context: $context")
-
-          if (rawDist == 0) (1, 0.0)
-          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
-        } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0)
-        }
-      }
-
-      var i = 0
+      // KROK 1: Zbieranie surowych danych (równolegle)
       val (satisfiedCount, totalNormalizedDistance) = (0 until numSolutions).par.map { i =>
         try {
           val context = DataProvider.createSolutionContext(i)
-          val rawDist = constraint.distance(context)
 
-          if (rawDist == 0) (1, 0.0)
-          else (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+          // Sprawdzamy spełnienie za pomocą eval()
+          val isSatisfied = try {
+            constraint.eval(context).asInstanceOf[Boolean]
+          } catch {
+            case _: ClassCastException => false
+            case _: Exception => false
+          }
+
+          if (isSatisfied) {
+            (1, 0.0) // Spełnione: count=1, distance=0.0
+          } else {
+            // Niespełnione: count=0, distance=znormalizowany rawDist
+            val rawDist = constraint.distance(context)
+            (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
+          }
         } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0)
+          case scala.util.control.NonFatal(e) => (0, 1.0) // Błąd krytyczny traktujemy jako max dystans
         }
       }.fold((0, 0.0)) { (acc, elem) =>
         (acc._1 + elem._1, acc._2 + elem._2)
       }
 
-      val satisfactionRate = satisfiedCount.toDouble / numSolutions.toDouble
-      val avgNormDist = totalNormalizedDistance / numSolutions.toDouble
-      val closenessRate = 1.0 - avgNormDist
+      // KROK 2: Utworzenie obiektu statystyk
+      val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, numSolutions)
 
-      if (satisfactionRate == 0.0 && closenessRate == 0.0) {
-        return SCALING_FACTOR
-      }
-
-      val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
-      //val denominator = (betaSq * satisfactionRate) + closenessRate
-      val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
-      val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
-
-      ((1.0 - fScore) * SCALING_FACTOR).toInt
+      // KROK 3: Obliczenie finalnej wartości heurystyki
+      computeHeuristicScore(stats)
     }
+  }
+
+  /**
+   * Metoda czysto obliczeniowa.
+   * Zamienia surowe statystyki na wartość liczbową (koszt) dla algorytmu A*.
+   * To tutaj można testować różne wzory na F-score.
+   */
+  private def computeHeuristicScore(stats: HeuristicStats): Int = {
+    val beta = 2.0
+    val betaSq = beta * beta
+    val SCALING_FACTOR = 1000
+
+    val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
+    val avgNormDist = stats.totalNormalizedDistance / stats.numSolutions.toDouble
+    val closenessRate = 1.0 - avgNormDist
+
+    // Warunek brzegowy: brak spełnień i maksymalny dystans
+    if (satisfactionRate == 0.0 && closenessRate == 0.0) {
+      return SCALING_FACTOR
+    }
+
+    // Obliczanie F-score (beta=2 promuje satisfactionRate)
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val fScoreDenominator = (betaSq * closenessRate) + satisfactionRate
+
+    val fScore = if (fScoreDenominator == 0) 0.0 else numerator / fScoreDenominator
+
+    // Odwracamy F-score, aby uzyskać koszt (im wyższy F-score, tym niższy koszt)
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
   }
 
 
