@@ -64,7 +64,7 @@ object ComponentRegistry extends LogTrait {
     new AddOperator[Integer],
     new SubOperator[Integer],
     new MulOperator[Integer],
-    new DivOperator[Integer],
+    //new DivOperator[Integer],
     new ModOperator[Integer],
 
 

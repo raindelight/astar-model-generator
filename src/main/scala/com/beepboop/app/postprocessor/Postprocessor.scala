@@ -223,7 +223,7 @@ case class RemoveUnnecessarySub() extends Rule {
   }
 }
 
-  case class RemoveUnnecessaryMult() extends Rule {
+case class RemoveUnnecessaryMult() extends Rule {
   override def condition[T: ClassTag]: Expression[T] => Boolean = {
     case b: BinaryExpression[T] =>
       val operatorIsMul = b.operator.isInstanceOf[MulOperator[?]]
@@ -256,6 +256,146 @@ case class RemoveUnnecessarySub() extends Rule {
 }
 
 
+case class VarDivToOne() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsDiv = b.operator.isInstanceOf[DivOperator[?]]
+
+      val AllAreVarsAndSameName = b.children.headOption match {
+        case Some(first: Variable[?]) =>
+          b.children.forall {
+            case v: Variable[?] => v.name == first.name
+            case _              => false
+          }
+        case None => true
+        case _    => false
+      }
+      operatorIsDiv && AllAreVarsAndSameName
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] => {
+      Constant[T](1.asInstanceOf[T])
+    }
+  }
+}
+
+
+case class VarDivToN() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] if b.operator.isInstanceOf[DivOperator[?]] =>
+      b.children match {
+        case List(numerator: BinaryExpression[?], denominator: Variable[?])
+          if numerator.operator.isInstanceOf[MulOperator[?]] =>
+
+          numerator.children match {
+            case List(c: Constant[?], v: Variable[?]) =>
+              v.name == denominator.name
+            case List(v: Variable[?], c: Constant[?]) =>
+              v.name == denominator.name
+            case _ => false
+          }
+        case _ => false
+      }
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] =>
+      val numerator = b.children.head.asInstanceOf[BinaryExpression[T]]
+
+      numerator.children.find(_.isInstanceOf[Constant[?]]) match {
+        case Some(constExpr) => constExpr.asInstanceOf[Expression[T]]
+        case None => b
+      }
+  }
+}
+
+case class SubVarsToZero() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsSub = b.operator.isInstanceOf[SubOperator[?]]
+      val AllAreVarsAndSameName = b.children.headOption match {
+        case Some(first: Variable[?]) =>
+          b.children.forall {
+            case v: Variable[?] => v.name == first.name
+            case _ => false
+          }
+        case None => true
+        case _ => false
+      }
+
+      operatorIsSub && AllAreVarsAndSameName
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] =>
+      Constant[T](0.asInstanceOf[T])
+  }
+
+}
+
+
+case class EqualityToTrue() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsEquatable = b.operator.isInstanceOf[EqualOperator[?]] ||
+          b.operator.isInstanceOf[LessEqualOperator[?]] ||
+          b.operator.isInstanceOf[GreaterEqualOperator[?]]
+
+      val AllAreVarsAndSameName = b.children.headOption match {
+        case Some(first: Variable[?]) =>
+          b.children.forall {
+            case v: Variable[?] => v.name == first.name
+            case _ => false
+          }
+        case None => true
+        case _ => false
+      }
+
+      operatorIsEquatable && AllAreVarsAndSameName
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] =>
+      Constant[T](true.asInstanceOf[T])
+  }
+
+}
+
+
+case class NotEqualityToFalse() extends Rule {
+  override def condition[T: ClassTag]: Expression[T] => Boolean = {
+    case b: BinaryExpression[T] =>
+      val operatorIsEquatable = b.operator.isInstanceOf[NotEqualOperator[?]] ||
+        b.operator.isInstanceOf[LessOperator[?]] ||
+        b.operator.isInstanceOf[GreaterOperator[?]]
+
+      val AllAreVarsAndSameName = b.children.headOption match {
+        case Some(first: Variable[?]) =>
+          b.children.forall {
+            case v: Variable[?] => v.name == first.name
+            case _ => false
+          }
+        case None => true
+        case _ => false
+      }
+
+      operatorIsEquatable && AllAreVarsAndSameName
+    case _ => false
+  }
+
+  override def action[T: ClassTag]: Expression[T] => Expression[T] = {
+    case b: BinaryExpression[T] =>
+      Constant[T](false.asInstanceOf[T])
+  }
+
+}
+
+
 object Postprocessor {
   private def availableRules = LazyList (
     JoinConstants(),
@@ -266,7 +406,12 @@ object Postprocessor {
     RemoveRedundantTrueAnd(),
     RemoveUnnecessaryMult(),
     RemoveUnnecessaryAdd(),
-    RemoveUnnecessarySub()
+    RemoveUnnecessarySub(),
+    VarDivToOne(),
+    VarDivToN(),
+    SubVarsToZero(),
+    EqualityToTrue(),
+    NotEqualityToFalse()
   )
   @tailrec
   private def applyAllRules[T : ClassTag](expr: Expression[T]): Expression[T] = {
