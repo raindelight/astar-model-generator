@@ -39,10 +39,6 @@ case class ModelNodeTMP(
   val f: Int = g + h
 }
 
-/**
- * Struktura przechowująca surowe statystyki o dopasowaniu ograniczenia do zbioru rozwiązań.
- * Używana do oddzielenia procesu zbierania danych od algorytmu obliczania oceny heurystycznej.
- */
 case class HeuristicStats(
                            satisfiedCount: Int,
                            totalNormalizedDistance: Double,
@@ -182,7 +178,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
             (0, rawDist.toDouble / (1.0 + rawDist.toDouble))
           }
         } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0) // Błąd krytyczny traktujemy jako max dystans
+          case scala.util.control.NonFatal(e) => (0, 1.0)
         }
       }.fold((0, 0.0)) { (acc, elem) =>
         (acc._1 + elem._1, acc._2 + elem._2)
