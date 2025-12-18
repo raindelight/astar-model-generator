@@ -188,7 +188,7 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
       }
 
       val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, minNormalizedDistance, numSolutions)
-      computeHeuristicScoreMinDist(stats)
+      computeHeuristicScore(stats)
     }
   }
 
