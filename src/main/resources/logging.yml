@@ -5,14 +5,14 @@ com.beepboop.app.MainApp:
   level: DEBUG
   enabled: true
 
-com.beepboop.app.DataImporter:
+com.beepboop.app.dataprovider.DataImporter:
   level: DEBUG
-  enabled: false
+  enabled: true
 
 
-com.beepboop.app.SolutionParser:
+com.beepboop.app.dataprovider.SolutionParser:
   level: DEBUG
-  enabled: false
+  enabled: true
 
 com.beepboop.app.ge_interpreter.AStarPhenotypeGenerator:
   level: DEBUG
@@ -62,16 +62,6 @@ com.beepboop.app.dataprovider.DataProvider$ParameterRegistry:
 com.beepboop.app.components.BinaryExpression:
   level: DEBUG
   enabled: false
-
-com.beepboop.app.dataprovider.DataImporter:
-  level: DEBUG
-  enabled: false
-
-
-com.beepboop.app.dataprovider.SolutionParser:
-  level: DEBUG
-  enabled: true
-
 
 com.beepboop.app.components.SumExpression:
   level: DEBUG

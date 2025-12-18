@@ -6,7 +6,16 @@ import scala.util.{Failure, Success, Try}
 import scala.language.postfixOps
 import spray.json.*
 import DefaultJsonProtocol.*
+import com.beepboop.app.MinizincDznVisitor
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.parser.NewMinizincParserBaseListener
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser}
+
+import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+
 
 object DataImporter extends DefaultJsonProtocol, LogTrait {
   def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
@@ -83,13 +92,36 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
 
     }
   }
-  def parseDzn(data: String, dataItems: List[DataItem]): Unit = {
-    return
 
+  def parseDzn(data: String, dataItems: List[DataItem]): Unit = {
+    try {
+      val charStream = CharStreams.fromString(data)
+      val lexer = new NewMinizincLexer(charStream)
+      val tokens = new CommonTokenStream(lexer)
+      val parser = new NewMinizincParser(tokens)
+
+      val tree = parser.model()
+
+      val visitor = new MinizincDznVisitor(dataItems)
+
+      tree.item().asScala.foreach { itemCtx =>
+        if (itemCtx.assign_item() != null) {
+          visitor.visitAssign_item(itemCtx.assign_item())
+        }
+      }
+
+      dataItems.filter(_.value != None).foreach { item =>
+        info(s"Parsed DZN value for ${item.name}: ${item.value}")
+      }
+
+    } catch {
+      case e: Exception =>
+        error(s"Error parsing DZN file: ${e.getMessage}")
+    }
   }
 
-
   def tryAutoDetectType(values: Array[String], isArray: Boolean): Any = {
+    debug(values.head)
     if (isArray) {
       val intList = Try(values.map(_.toInt).toList).toOption
       if (intList.isDefined) return intList.get
@@ -102,6 +134,7 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
         case "false" | "0" | "no"  => false
         case _ => throw new IllegalArgumentException("Not a boolean")
       }).toList).toOption
+      debug(boolList.toString)
       if (boolList.isDefined) return boolList.get
 
       return values.toList

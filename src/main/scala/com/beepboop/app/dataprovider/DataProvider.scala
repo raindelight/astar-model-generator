@@ -127,22 +127,28 @@ object DataProvider extends LogTrait {
 //      variables.filter(_.value != None)
 
 
-      val knownSolutions = SolutionParser.parse(solutionsPath.get, separator = ';')
+      val knownSolutions = SolutionParser.parse(solutionsPath.get, separator = ';', DataProvider.this.variables)
       if (knownSolutions.nonEmpty) {
         info("Updating variable data types based on the first found solution...")
         val firstSolutionMap = knownSolutions.head
 
         DataProvider.this.variables = DataProvider.this.variables.map { dataItem =>
-          firstSolutionMap.get(dataItem.name) match {
-            case Some(valueFromSolution) =>
-              val (newDataTypeString, newDetailedType) = ModelParser.deriveDataType(valueFromSolution)
-
-              dataItem.copy(
-                dataType = newDataTypeString,
-                detailedDataType = newDetailedType
-              )
-            case None =>
-              dataItem
+          debug(s"DataItem is $dataItem")
+          if (dataItem.detailedDataType != null) {
+            dataItem
+          } else {
+            firstSolutionMap.get(dataItem.name) match {
+              case Some(valueFromSolution) =>
+                val (newDataTypeString, newDetailedType) = ModelParser.deriveDataType(valueFromSolution)
+                debug(s"New typeString is: " + newDataTypeString)
+                debug(s"New detailedType is: " + newDetailedType)
+                dataItem.copy(
+                  dataType = newDataTypeString,
+                  detailedDataType = newDetailedType
+                )
+              case None =>
+                dataItem
+            }
           }
         }
         debug("Variable types have been updated.")

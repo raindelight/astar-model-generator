@@ -16,10 +16,12 @@ class MinizincModelListener(tokens: CommonTokenStream, extendedDataType: Boolean
   def getDataItems: List[DataItem] = dataItemsBuffer.toList
 
   private def textWithSpaces(ctx: ParserRuleContext): String = {
+    if (ctx == null) return ""
     val start = ctx.getStart.getTokenIndex
     val stop = ctx.getStop.getTokenIndex
     tokens.getText(new Interval(start, stop))
   }
+
 
   override def enterVar_decl_item(ctx: Var_decl_itemContext): Unit = {
     assert(ctx != null)

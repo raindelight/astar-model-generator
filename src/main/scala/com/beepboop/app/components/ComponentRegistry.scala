@@ -7,6 +7,7 @@ package com.beepboop.app.components
 import com.beepboop.app.components.Operator
 import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
+import com.beepboop.app.components.StrEqExpression.StrEqFactory
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
 
@@ -114,7 +115,16 @@ object ComponentRegistry extends LogTrait {
     SumExpression.IntListSumFactory,
     ForAllExpression.ForAllIntListFactory,
     CountExpression.IntListCountFactory,
-    AllDifferentExpression.ListAllDifferentFactory
+    AllDifferentExpression.ListAllDifferentFactory,
+    ExistsExpression.ExistsIntListFactory,
+    MinimumExpression.ListMinimumFactory,
+    MaximumExpression.ListMaximumFactory,
+    GlobalCardinalityExpression.GlobalCardinalityFactory,
+    DiffnExpression.DiffnFactory,
+    ValuePrecedesChainExpression.ValuePrecedesChainFactory,
+    StrEqExpression.StrEqFactory
+    //CumulativeExpression
+    //LexicographicalExpression.asCreatable()
   )
 
   val creatables: List[Creatable] =
