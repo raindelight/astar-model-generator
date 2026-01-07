@@ -10,6 +10,10 @@ import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.components.StrEqExpression.StrEqFactory
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
+import org.yaml.snakeyaml.Yaml
+import scala.jdk.CollectionConverters._
+import java.io.FileInputStream
+import java.util.{Map => JMap}
 
 sealed trait ExpressionType
 case object IntType extends ExpressionType
@@ -46,9 +50,6 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
   case c if c == classOf[List[Task]] =>
     ListTaskType
 
-  case c if c == classOf[List[RectDescriptor]] =>
-    ListRectType
-
   case c if c == classOf[Map[Integer, Integer]] =>
     MapIntToIntType
 
@@ -59,7 +60,17 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
     throw new Exception(s"Unsupported type: ${cls.getName}")
 }
 
+
+private def toScala(value: Any): Any = value match {
+  case m: java.util.Map[_, _] =>
+    m.asScala.view.mapValues(toScala).toMap
+  case l: java.util.List[_] =>
+    l.asScala.map(toScala).toList
+  case other => other
+}
+
 object ComponentRegistry extends LogTrait {
+
   private val binaryOperators: List[BinaryOperator[?]] = List(
     // arithmetic
     new AddOperator[Integer],
@@ -127,19 +138,50 @@ object ComponentRegistry extends LogTrait {
     //LexicographicalExpression.asCreatable()
   )
 
-  val creatables: List[Creatable] =
+  private def toScala(value: Any): Any = value match {
+    case m: java.util.Map[_, _] =>
+      m.asScala.view.mapValues(toScala).toMap
+    case l: java.util.List[_] =>
+      l.asScala.map(toScala).toList
+    case other => other
+  }
+
+  private val configFile = "src/main/resources/expressions.yml"
+  private lazy val creatablesConfig: Map[String, Boolean] = {
+
+    val yaml = new Yaml()
+    val input = new FileInputStream(configFile)
+    try {
+      val javaData = yaml.load[JMap[String, Object]](input)
+      javaData.asScala.toMap.map { case (k, v) =>
+        k -> v.asInstanceOf[Boolean]
+      }
+    } finally {
+      input.close()
+    }
+  }
+
+  val creatables: List[Creatable] = (
         binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
         unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
         allConstantFactories ++
         allVariablesFactories ++
         expressionFactories
+    ).filter(c =>
+      creatablesConfig.getOrElse(c.toString, false)
+    )
+
+
   debug(s"creatables: $creatables")
+
 
 
 
   def findCreatablesReturning(outputType: ExpressionType): List[Creatable] = {
     creatables.filter(_.templateSignature.output == outputType)
   }
+
+
 
   def findOperatorReturning(outputType: ExpressionType): List[Operator[?]] = {
     allOperators.filter(_.signature.output == outputType)

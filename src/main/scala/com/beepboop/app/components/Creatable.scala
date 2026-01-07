@@ -4,7 +4,7 @@ package com.beepboop.app.components
 class RandomVariableFactory(
                              val varType: ExpressionType,
                              val availableNames: List[String]
-                           ) extends Creatable {
+                           ) extends Creatable with AutoNamed {
   override def templateSignature: Signature = Signature(inputs = Nil, output = varType)
 
   override def create(children: List[Expression[?]]): Expression[?] = {
@@ -16,6 +16,7 @@ class RandomVariableFactory(
     createWithName(randomName)
   }
 
+  override def ownerClass: Class[_] = Variable.getClass
 
   def createWithName(name: String): Expression[?] = {
     varType match {
