@@ -94,17 +94,24 @@ class DistanceSpec extends AnyFlatSpec with Matchers {
     println("\n--- Testing DiffnExpression ---")
     val ctx = Map[String, Any]()
 
-    val r1 = RectDescriptor(Constant(0), Constant(0), Constant(2), Constant(2))
-    val r2 = RectDescriptor(Constant(1), Constant(1), Constant(2), Constant(2))
-    val expr = DiffnExpression(Constant(List(r1, r2)))
+    val expr = DiffnExpression(
+      Constant(List(0,1)),
+      Constant(List(0,1)),
+      Constant(List(2,2)),
+      Constant(List(2,2))
+    )
+
     val d1 = expr.distance(ctx)
     println(s"Rects: Overlapping (0,0,2,2) & (1,1,2,2) | Expected: 1 | Actual: $d1")
     expr.eval(ctx) should be (false)
     d1 should be (1)
 
-    val r3 = RectDescriptor(Constant(0), Constant(0), Constant(2), Constant(2))
-    val r4 = RectDescriptor(Constant(3), Constant(3), Constant(2), Constant(2))
-    val exprSafe = DiffnExpression(Constant(List(r3, r4)))
+    val exprSafe = DiffnExpression(
+      Constant(List(0,3)),
+      Constant(List(0,3)),
+      Constant(List(2,2)),
+      Constant(List(2,2))
+    )
     val d2 = exprSafe.distance(ctx)
     println(s"Rects: Disjoint (0,0,2,2) & (3,3,2,2) | Expected: 0 | Actual: $d2")
     d2 should be (0)

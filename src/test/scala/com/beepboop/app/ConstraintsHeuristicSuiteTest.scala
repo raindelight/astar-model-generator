@@ -19,12 +19,6 @@ class ConstraintsHeuristicSuiteTest extends AnyFunSuite {
     value.map { case (k, v) => (i(k), i(v)) }
   }
 
-  private def rectsList(value: List[(Int, Int, Int, Int)]): List[RectDescriptor] = {
-    value.map { case (x, y, w, h) =>
-      RectDescriptor(c(x), c(y), c(w), c(h))
-    }
-  }
-
   private def binOp(left: Expression[?], op: BinaryOperator[?], right: Expression[?]): Expression[Boolean] =
     BinaryExpression(left, op.asInstanceOf[BinaryOperator[Any]], right).asInstanceOf[Expression[Boolean]]
 
@@ -153,14 +147,38 @@ class ConstraintsHeuristicSuiteTest extends AnyFunSuite {
   }
 
   test("Diffn_Fail_Overlap") {
-    val expr = DiffnExpression(Variable[List[RectDescriptor]]("rects"))
-    val ctx = Map("rects" -> rectsList(List((0, 0, 2, 2), (1, 1, 2, 2))))
+    val expr = DiffnExpression(
+      Variable[List[Integer]]("x"),
+      Variable[List[Integer]]("y"),
+      Variable[List[Integer]]("dx"),
+      Variable[List[Integer]]("dy"),
+
+    )
+    val ctx = Map(
+      "x" -> List(0,1),
+      "y" -> List(0,1),
+      "dx" -> List(2,2),
+      "dy" -> List(2,2)
+    )
     check("Diffn_Fail_Overlap", expr, ctx, 1)
   }
 
   test("Diffn_Satisfied") {
-    val expr = DiffnExpression(Variable[List[RectDescriptor]]("rects"))
-    val ctx = Map("rects" -> rectsList(List((0, 0, 2, 2), (2, 0, 2, 2))))
+
+    val expr = DiffnExpression(
+      Variable[List[Integer]]("x"),
+      Variable[List[Integer]]("y"),
+      Variable[List[Integer]]("dx"),
+      Variable[List[Integer]]("dy"),
+
+    )
+    val ctx = Map(
+      "x" -> List(0,2),
+      "y" -> List(0,0),
+      "dx" -> List(2,2),
+      "dy" -> List(2,2)
+    )
+
     check("Diffn_Satisfied", expr, ctx, 0)
   }
 
