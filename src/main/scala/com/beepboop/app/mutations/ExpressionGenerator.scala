@@ -3,6 +3,10 @@ package com.beepboop.app.mutations
 import com.beepboop.app.components.*
 import com.beepboop.app.logger.LogTrait
 
+
+
+
+
 object ExpressionGenerator extends LogTrait {
   def generate(requiredType: ExpressionType, maxDepth: Int): Option[Expression[?]] = {
     val registry = ComponentRegistry
@@ -12,6 +16,7 @@ object ExpressionGenerator extends LogTrait {
       registry.findCreatablesReturning(requiredType)
     }
     debug(s"possibleCreatables count: ${possibleCreatables.length}")
+    debug(s"possibleCreatables: ${possibleCreatables.mkString(",")}")
 
     if (possibleCreatables.isEmpty) return {
       warn(s"possibleCreatables are empty, returning")

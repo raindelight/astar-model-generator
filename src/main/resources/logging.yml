@@ -32,8 +32,8 @@ com.beepboop.app.mutations.ReplaceOperator:
   enabled: false
 
 com.beepboop.app.mutations.ExpressionGenerator:
-  level: WARN
-  enabled: false
+  level: DEBUG
+  enabled: true
 
 
 com.beepboop.app.mutations.ReplaceSubtree:
@@ -46,7 +46,7 @@ com.beepboop.app.dataprovider.ModelParser:
   enabled: true
 
 com.beepboop.app.dataprovider.DataProvider:
-  level: INFO
+  level: DEBUG
   enabled: true
 
 com.beepboop.app.dataprovider.DataProvider$VarRegistry:
