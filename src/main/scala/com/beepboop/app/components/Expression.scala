@@ -98,6 +98,53 @@ object Constant {
   }
 }
 
+case class ArrayElement[ReturnT : ClassTag](
+                                           variable: Expression[List[ReturnT]],
+                                           index: Expression[Integer]
+                                           ) extends Expression[ReturnT] with ComposableExpression {
+  override def children: List[Expression[?]] = List(variable, index)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "ArrayElement requires exactly two children.")
+    this.copy(variable = newChildren.head.asInstanceOf[Expression[List[ReturnT]]],
+      index = newChildren(1).asInstanceOf[Expression[Integer]])
+  }
+
+  override def eval(context: Map[String, Any]): ReturnT = {
+    variable.eval(context).apply(index.eval(context))
+  }
+
+  override def toString: String = s"${variable.toString}[${index.toString}]"
+  override def evalToString: String = s"${variable.toString}[${index.evalToString}]"
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
+    val intInputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+    val singleOutputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    Signature(inputs = List(listInputType,  intInputType), singleOutputType)
+  }
+
+}
+
+object ArrayElement {
+  def asCreatable[T: ClassTag](): Creatable = new Creatable with AutoNamed {
+    override def templateSignature: Signature = {
+      val listInputType = scalaTypeToExprType(classTag[List[T]].runtimeClass)
+      val intInputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+      val singleOutputType = scalaTypeToExprType(classTag[T].runtimeClass)
+      Signature(inputs = List(listInputType, intInputType), output = singleOutputType)
+    }
+
+    override def create(children: List[Expression[?]]): Expression[T] = {
+      require(children.length == 2, "ArrayElement requires two children.")
+      ArrayElement[T](children(0).asInstanceOf[Expression[List[T]]], children(1).asInstanceOf[Expression[Integer]])
+
+    }
+
+    override def ownerClass: Class[_] = ArrayElement.getClass
+  }
+}
+
 case class IteratorDef[IterT : ClassTag](
                               variableName: String,
                               collection: Expression[List[IterT]]

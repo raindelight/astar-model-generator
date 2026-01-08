@@ -1,4 +1,6 @@
 BinaryExpression: false
 ExistsExpression: false
-DiffnExpression: true
+DiffnExpression: false
 Variable: true
+Constant: true
+ArrayElement: true

@@ -11,9 +11,10 @@ import com.beepboop.app.components.StrEqExpression.StrEqFactory
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
 import org.yaml.snakeyaml.Yaml
-import scala.jdk.CollectionConverters._
+
+import scala.jdk.CollectionConverters.*
 import java.io.FileInputStream
-import java.util.{Map => JMap}
+import java.util.Map as JMap
 
 sealed trait ExpressionType
 case object IntType extends ExpressionType
@@ -121,6 +122,10 @@ object ComponentRegistry extends LogTrait {
     Constant.asCreatable[Integer](() => scala.util.Random.nextInt(10)),
     Constant.asCreatable[Boolean](() => scala.util.Random.nextBoolean())
   )
+  private val allArrayElementFactories: List[Creatable] = List(
+    ArrayElement.asCreatable[Integer](),
+    ArrayElement.asCreatable[Boolean](),
+  )
 
   private val expressionFactories: List[Creatable] = List(
     SumExpression.IntListSumFactory,
@@ -133,7 +138,7 @@ object ComponentRegistry extends LogTrait {
     GlobalCardinalityExpression.GlobalCardinalityFactory,
     DiffnExpression.DiffnFactory,
     ValuePrecedesChainExpression.ValuePrecedesChainFactory,
-    StrEqExpression.StrEqFactory
+    StrEqExpression.StrEqFactory,
     //CumulativeExpression
     //LexicographicalExpression.asCreatable()
   )
@@ -166,7 +171,8 @@ object ComponentRegistry extends LogTrait {
         unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
         allConstantFactories ++
         allVariablesFactories ++
-        expressionFactories
+        expressionFactories ++
+          allArrayElementFactories
     ).filter(c =>
       creatablesConfig.getOrElse(c.toString, false)
     )
