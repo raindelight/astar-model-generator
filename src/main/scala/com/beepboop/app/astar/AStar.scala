@@ -259,9 +259,12 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val constraint = node.constraint
 
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
+
     val neighbors = possibleMutations.flatMap {
-      case (targetNode, mutationFunc) =>
-        mutationFunc(targetNode).flatMap { replacement =>
+      case (targetNode, mutationFunc, ctx) =>
+
+        mutationFunc(targetNode, ctx).flatMap { replacement =>
+
           if (replacement.signature.output != targetNode.signature.output) {
             debug(s"Type Mismatch: ${targetNode.signature.output} vs ${replacement.signature.output}")
             None
@@ -273,10 +276,9 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
                 Postprocessor.simplify(expr)
             }
 
-
             debug(s"Generated: $candidateTree to simplified $simplifiedTree")
             val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
-            debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
+
             if (result.isAllowed) {
               Profiler.recordValue("accepted", 1)
               Some(simplifiedTree)
@@ -294,7 +296,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     debug(neighbors.toString)
     neighbors.toSet.toList
   }
-
 
   private def computeMinStepsHeuristic(): Map[String, Int] = {
     val costs = mutable.Map[String, Int]()

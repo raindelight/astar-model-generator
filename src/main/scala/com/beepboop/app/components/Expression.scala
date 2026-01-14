@@ -3,6 +3,7 @@ package com.beepboop.app.components
 import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.mutations.{ContextAwareCreatable, GenerationContext}
 import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
@@ -419,28 +420,40 @@ case class ForAllExpression[IterT](
 
 
 object ForAllExpression {
-  object ForAllIntListFactory extends Creatable with AutoNamed {
+  object ForAllIntListFactory extends Creatable with AutoNamed with ContextAwareCreatable {
 
-    override def templateSignature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+    override def templateSignature: Signature = Signature(List(ListIntType, BoolType), BoolType)
 
-    override def create(children: List[Expression[?]]): Expression[?] = {
-      require(children.length == 2)
+    // Standard create is not used by the generator anymore for this factory
+    override def create(children: List[Expression[?]]): Expression[?] =
+      throw new UnsupportedOperationException("This factory requires context-aware generation.")
 
-      val collectionExpr = children(0).asInstanceOf[Expression[List[Integer]]]
-      val bodyExpr = children(1).asInstanceOf[Expression[Boolean]]
+    override def generateExpression(
+                                     ctx: GenerationContext,
+                                     recurse: (ExpressionType, GenerationContext) => Option[Expression[?]]
+                                   ): Option[Expression[?]] = {
 
-      val iterator = IteratorDef(VarNameGenerator.generateUniqueName(), collectionExpr)
+      val collectionOpt = recurse(ListIntType, ctx).map(_.asInstanceOf[Expression[List[Integer]]])
+      if (collectionOpt.isEmpty) return None
 
-      ForAllExpression(iterator, bodyExpr)
+      val varName = VarNameGenerator.generateUniqueName("f")
+
+      val newCtx = ctx.withVariable(varName, IntType)
+
+      val bodyOpt = recurse(BoolType, newCtx).map(_.asInstanceOf[Expression[Boolean]])
+
+      if (bodyOpt.isEmpty) return None
+
+      val iterator = IteratorDef(varName, collectionOpt.get)
+      Some(ForAllExpression(iterator, bodyOpt.get))
     }
 
     override def ownerClass: Class[_] = ForAllExpression.getClass
-
   }
 }
 
 
-//Based on ForAllExpression
+
 case class ExistsExpression[IterT](
                                     iteratorDef: IteratorDef[IterT],
                                     body: Expression[Boolean]

@@ -36,13 +36,17 @@ object Scanner extends LogTrait {
     val localRes = locals.foldLeft[PolicyResult](DefaultSuccess)(_ && _.validate(node))
     if (!localRes.isAllowed) return localRes
 
-    val (currLocals, currGlobals) = node match {
+    val (newLocals, newGlobals) = node match {
       case m: ScopeModifier =>
-        val newPols = m.getAdditionalPolicies
-        (locals ++ newPols.collect{case p: LocalPolicy => p},
-          globals ++ newPols.collect{case p: GlobalPolicy => p})
-      case _ => (locals, globals)
+        val extras = m.getAdditionalPolicies
+        (extras.collect { case p: LocalPolicy => p }, extras.collect { case p: GlobalPolicy => p })
+      case _ =>
+        (Nil, Nil)
     }
+
+    val currLocals = locals ++ newLocals
+    val currGlobals = globals ++ newGlobals
+
 
     node match {
       case c: ComposableExpression =>
@@ -51,13 +55,8 @@ object Scanner extends LogTrait {
 
         if (!childrenRes.isAllowed) return childrenRes
 
-        node match {
-          case m: ScopeModifier =>
-            val myGlobals = m.getAdditionalPolicies.collect{ case p: GlobalPolicy => p }
-            myGlobals.foldLeft[PolicyResult](childrenRes) { (res, pol) =>
-              if (pol.isSatisfied) res else NonCompliant(node, pol.message)
-            }
-          case _ => childrenRes
+        newGlobals.foldLeft[PolicyResult](childrenRes) { (res, pol) =>
+          if (pol.isSatisfied) res else NonCompliant(node, pol.message)
         }
 
       case _ => Compliant

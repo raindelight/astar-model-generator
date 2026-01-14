@@ -103,7 +103,7 @@ object MainApp extends LogTrait {
 
     ConstraintPicker.setConfig(config)
     /* vvv comment if no gurobi license present vvv */
-    ConstraintPicker.runInitial(result.get)
+    //ConstraintPicker.runInitial(result.get)
 
 
 
