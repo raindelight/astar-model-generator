@@ -21,41 +21,58 @@ object AllMutations {
 
 
 class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
-  def mutate(tree: Expression[?]): Expression[?]= {
+  def mutate(tree: Expression[?]): Expression[?] = {
     val allPossibleMutations = collectPossibleMutations(tree)
 
     if (allPossibleMutations.isEmpty) {
       warn("No possible mutations found")
       tree
     } else {
-      val (nodeToReplace, mutationToApply) = allPossibleMutations(
+      val (nodeToReplace, mutationToApply, contextForNode) = allPossibleMutations(
         scala.util.Random.nextInt(allPossibleMutations.length)
       )
 
-      info(s"Applying mutation '${mutationToApply.name} to node '${nodeToReplace}'")
+      info(s"Applying mutation '${mutationToApply.name}' to node '$nodeToReplace'")
 
-      replaceNodeInTree(tree, nodeToReplace, mutationToApply(nodeToReplace).get)
+      val mutatedNode = mutationToApply(nodeToReplace, contextForNode).get
 
+      replaceNodeInTree(tree, nodeToReplace, mutatedNode)
     }
   }
 
-
   def collectPossibleMutations(
-                                      current: Expression[?]
-                                      ): List[(Expression[?], Mutation)] = {
+                                current: Expression[?],
+                                ctx: GenerationContext = GenerationContext()
+                              ): List[(Expression[?], Mutation, GenerationContext)] = {
+
     val mutationsForThisNode = activeMutations
-      .filter(mutation => mutation(current).isDefined)
-      .map(mutation => (current, mutation))
-    debug(s"Mutations available for node ${current.toString}: ${mutationsForThisNode.map(mut => mut._2.name)}")
+      .filter(mutation => mutation(current, ctx).isDefined)
+      .map(mutation => (current, mutation, ctx))
+
+    debug(s"Mutations available for node ${current.toString}: ${mutationsForThisNode.map(_._2.name)}")
+
     val mutationsForChildren = current match {
+      case f: ForAllExpression[?] =>
+        val listType = f.iteratorDef.collection.signature.output
+        val innerType = listType match {
+          case ListIntType => IntType
+          case _ => UnknownType
+        }
+
+        val innerCtx = ctx.withVariable(f.iteratorDef.variableName, innerType)
+
+        collectPossibleMutations(f.iteratorDef.collection, ctx) ++
+          collectPossibleMutations(f.body, innerCtx)
+
       case c: ComposableExpression =>
-        c.children.flatMap(child => collectPossibleMutations(child))
+        c.children.flatMap(child => collectPossibleMutations(child, ctx))
+
       case _ =>
         List.empty
     }
+
     mutationsForThisNode ++ mutationsForChildren
   }
-
    def replaceNodeInTree(root: Expression[?], target: Expression[?], replacement: Expression[?]): Expression[?] = {
     if (root eq target){
       return replacement

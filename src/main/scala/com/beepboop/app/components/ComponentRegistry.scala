@@ -73,13 +73,14 @@ private def toScala(value: Any): Any = value match {
 object ComponentRegistry extends LogTrait {
 
   private val binaryOperators: List[BinaryOperator[?]] = List(
+    /*
     // arithmetic
     new AddOperator[Integer],
     new SubOperator[Integer],
     new MulOperator[Integer],
     //new DivOperator[Integer],
     new ModOperator[Integer],
-
+    */
 
     // relational
     new EqualOperator[Integer],
@@ -152,35 +153,44 @@ object ComponentRegistry extends LogTrait {
   }
 
   private val configFile = "src/main/resources/expressions.yml"
-  private lazy val creatablesConfig: Map[String, Boolean] = {
-
+  private lazy val creatablesConfig: Map[String, Double] = {
     val yaml = new Yaml()
     val input = new FileInputStream(configFile)
     try {
-      val javaData = yaml.load[JMap[String, Object]](input)
+      val javaData = yaml.load[java.util.Map[String, Object]](input)
+
+      def toDouble(obj: Object): Double = obj match {
+        case d: java.lang.Double => d.doubleValue()
+        case i: java.lang.Integer => i.doubleValue()
+        case b: java.lang.Boolean => if (b) 1.0 else 0.0
+        case _ => 0.0
+      }
+
       javaData.asScala.toMap.map { case (k, v) =>
-        k -> v.asInstanceOf[Boolean]
+        k -> toDouble(v)
       }
     } finally {
       input.close()
     }
   }
 
-  val creatables: List[Creatable] = (
-        binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
-        unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
-        allConstantFactories ++
-        allVariablesFactories ++
-        expressionFactories ++
-          allArrayElementFactories
-    ).filter(c =>
-      creatablesConfig.getOrElse(c.toString, false)
-    )
 
+  val creatables: List[Creatable] = (
+    binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
+      unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
+      allConstantFactories ++
+      allVariablesFactories ++
+      expressionFactories ++
+      allArrayElementFactories
+    ).filter(c =>
+    creatablesConfig.getOrElse(c.toString, 0.0) > 0.0
+  )
 
   debug(s"creatables: $creatables")
 
-
+  def getWeight(c: Creatable): Double = {
+    creatablesConfig.getOrElse(c.toString, 1.0)
+  }
 
 
   def findCreatablesReturning(outputType: ExpressionType): List[Creatable] = {
