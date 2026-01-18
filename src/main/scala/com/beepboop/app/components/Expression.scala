@@ -4,7 +4,7 @@ import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.mutations.{ContextAwareCreatable, GenerationContext}
-import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
+import com.beepboop.app.policy.{EnsureSpecificVarExists, NoDuplicateVar, Policy}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
 
@@ -1003,14 +1003,13 @@ case class DiffnExpression(
                             dx: Expression[List[Integer]],
                             dy: Expression[List[Integer]]
                           ) extends Expression[Boolean]
+  with ScopeModifier
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(x, y, dx, dy)
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
     require(newChildren.length == 4, "DiffnExpression requires exactly four children (x, y, dx, dy) for reconstruction")
-
-
     DiffnExpression(
       newChildren(0).asInstanceOf[Expression[List[Integer]]],
       newChildren(1).asInstanceOf[Expression[List[Integer]]],
@@ -1019,51 +1018,83 @@ case class DiffnExpression(
     )
   }
 
+  override def getAdditionalPolicies: List[Policy] = {
+    List(NoDuplicateVar())
+  }
+
   override def eval(context: Map[String, Any]): Boolean = {
-    val xVal = x.eval(context).map(_.intValue())
-    val yVal = y.eval(context).map(_.intValue())
-    val dxVal = dx.eval(context).map(_.intValue())
-    val dyVal = dy.eval(context).map(_.intValue())
+    try {
 
-    val n = xVal.size
-    require(yVal.size == n && dxVal.size == n && dyVal.size == n, "All input arrays for diffn must have the same length")
+      val rawX = x.eval(context)
+      val rawY = y.eval(context)
+      val rawDx = dx.eval(context)
+      val rawDy = dy.eval(context)
 
-    for (i <- 0 until n; j <- (i + 1) until n) {
-      if (rectanglesOverlap(
-        xVal(i), yVal(i), dxVal(i), dyVal(i),
-        xVal(j), yVal(j), dxVal(j), dyVal(j)
-      )) {
-        return false
+
+      def getTypeName(l: List[Any]): String =
+        if (l.isEmpty) "Empty" else l.head.getClass.getSimpleName
+
+
+
+      val xVal = rawX.map(_.intValue())
+      val yVal = rawY.map(_.intValue())
+      val dxVal = rawDx.map(_.intValue())
+      val dyVal = rawDy.map(_.intValue())
+
+      val n = xVal.size
+
+      require(yVal.size == n && dxVal.size == n && dyVal.size == n, "All input arrays for diffn must have the same length")
+
+      for (i <- 0 until n; j <- (i + 1) until n) {
+        if (rectanglesOverlap(
+          xVal(i), yVal(i), dxVal(i), dyVal(i),
+          xVal(j), yVal(j), dxVal(j), dyVal(j)
+        )) {
+            return false
+        }
       }
+      true
+    } catch {
+      case e: Exception =>
+        error(e.getMessage)
+        throw e
     }
-    true
   }
 
   override def distance(context: Map[String, Any]): Int = {
-    val xVal = x.eval(context)
-    val yVal = y.eval(context)
-    val dxVal = dx.eval(context)
-    val dyVal = dy.eval(context)
+    try {
+      val rawX = x.eval(context)
+      val rawY = y.eval(context)
+      val rawDx = dx.eval(context)
+      val rawDy = dy.eval(context)
 
-    val n = xVal.size
-    var totalOverlapArea = 0
+      val xVal = rawX.map(_.intValue())
+      val yVal = rawY.map(_.intValue())
+      val dxVal = rawDx.map(_.intValue())
+      val dyVal = rawDy.map(_.intValue())
 
-    for (i <- 0 until n; j <- (i + 1) until n) {
-      totalOverlapArea += intersectionArea(
-        xVal(i), yVal(i), dxVal(i), dyVal(i),
-        xVal(j), yVal(j), dxVal(j), dyVal(j)
-      )
+      val n = xVal.size
+      var totalOverlapArea = 0
+
+      for (i <- 0 until n; j <- (i + 1) until n) {
+        totalOverlapArea += intersectionArea(
+          xVal(i), yVal(i), dxVal(i), dyVal(i),
+          xVal(j), yVal(j), dxVal(j), dyVal(j)
+        )
+      }
+
+      totalOverlapArea
+
+    } catch {
+      case e: Exception =>
+        throw e
     }
-
-    totalOverlapArea
   }
-
 
   private def rectanglesOverlap(x1: Int, y1: Int, w1: Int, h1: Int,
                                 x2: Int, y2: Int, w2: Int, h2: Int): Boolean = {
     if (x1 + w1 <= x2 || x2 + w2 <= x1) return false
     if (y1 + h1 <= y2 || y2 + h2 <= y1) return false
-
     true
   }
 
@@ -1071,7 +1102,6 @@ case class DiffnExpression(
                                x2: Int, y2: Int, w2: Int, h2: Int): Int = {
     val xOverlap = Math.max(0, Math.min(x1 + w1, x2 + w2) - Math.max(x1, x2))
     val yOverlap = Math.max(0, Math.min(y1 + h1, y2 + h2) - Math.max(y1, y2))
-
     xOverlap * yOverlap
   }
 
@@ -1082,17 +1112,15 @@ case class DiffnExpression(
   override def signature: Signature =
     val outputType = scalaTypeToExprType(classTag[Boolean].runtimeClass)
     Signature(
-    inputs = List(
-      x.signature.output,
-      y.signature.output,
-      dx.signature.output,
-      dy.signature.output
-    ),
-    output = outputType
-  )
-
+      inputs = List(
+        x.signature.output,
+        y.signature.output,
+        dx.signature.output,
+        dy.signature.output
+      ),
+      output = outputType
+    )
 }
-
 
 object DiffnExpression {
   object DiffnFactory extends Creatable with AutoNamed {

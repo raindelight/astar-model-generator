@@ -6,14 +6,15 @@ import com.beepboop.app.logger.LogTrait
 
 object AllMutations {
   val mutations: List[Mutation] = List(
-    ReplaceOperator,
-    TransformVariableToConstant,
-    TransformConstantToVariable,
-    ChangeVariable,
+    //ReplaceOperator,
+    //TransformVariableToConstant,
+    //TransformConstantToVariable,
+    //ChangeVariable,
     ReplaceSubtree(1),
-    ReplaceSubtree(2),
-    ReplaceSubtree(3),
-    ReplaceSubtree(4),
+    //ReplaceSubtree(2),
+    //ReplaceSubtree(3),
+    //ReplaceSubtree(4),
+    GenerateAllDiffn
   )
 
   val directory: Map[String, Mutation] = mutations.map(m => m.name -> m).toMap
@@ -28,26 +29,28 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
       warn("No possible mutations found")
       tree
     } else {
-      val (nodeToReplace, mutationToApply, contextForNode) = allPossibleMutations(
+      val (nodeToReplace, mutationToApply, contextForNode, selectedVariant) = allPossibleMutations(
         scala.util.Random.nextInt(allPossibleMutations.length)
       )
 
       info(s"Applying mutation '${mutationToApply.name}' to node '$nodeToReplace'")
 
-      val mutatedNode = mutationToApply(nodeToReplace, contextForNode).get
-
-      replaceNodeInTree(tree, nodeToReplace, mutatedNode)
+      replaceNodeInTree(tree, nodeToReplace, selectedVariant)
     }
   }
 
   def collectPossibleMutations(
                                 current: Expression[?],
                                 ctx: GenerationContext = GenerationContext()
-                              ): List[(Expression[?], Mutation, GenerationContext)] = {
+                              ): List[(Expression[?], Mutation, GenerationContext, Expression[?])] = {
 
-    val mutationsForThisNode = activeMutations
-      .filter(mutation => mutation(current, ctx).isDefined)
-      .map(mutation => (current, mutation, ctx))
+    val mutationsForThisNode = activeMutations.flatMap { mutation =>
+      val variants = mutation(current, ctx)
+
+      variants.map { variant =>
+        (current, mutation, ctx, variant)
+      }
+    }
 
     debug(s"Mutations available for node ${current.toString}: ${mutationsForThisNode.map(_._2.name)}")
 
@@ -73,8 +76,9 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
 
     mutationsForThisNode ++ mutationsForChildren
   }
-   def replaceNodeInTree(root: Expression[?], target: Expression[?], replacement: Expression[?]): Expression[?] = {
-    if (root eq target){
+
+  def replaceNodeInTree(root: Expression[?], target: Expression[?], replacement: Expression[?]): Expression[?] = {
+    if (root eq target) {
       return replacement
     }
 

@@ -2,17 +2,16 @@ package debugger
 
 import com.beepboop.app.astar.ModelNodeTMP
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
+import com.beepboop.app.dataprovider.DataProvider
 
 import java.awt.{BorderLayout, Dimension, FlowLayout}
 import javax.swing.*
 import javax.swing.tree.*
 import javax.swing.table.DefaultTableModel
-import java.awt.event.{ActionListener}
+import javax.swing.event.{DocumentEvent, DocumentListener}
+import java.awt.event.ActionListener
 import java.io.*
 import scala.util.{Failure, Success, Try}
-import scala.reflect.ClassTag
-import com.beepboop.app.dataprovider.DataProvider
-
 
 object VisualDebugger {
   def launch(initialFilePath: String): Unit = {
@@ -42,6 +41,9 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
 
   private val listModel = new DefaultListModel[AnyRef]()
   private val nodeList = new JList[AnyRef](listModel)
+
+  private val searchField = new JTextField()
+
   private val openSetRadio = new JRadioButton("Open Set", true)
   private val visitedSetRadio = new JRadioButton("Visited Set")
 
@@ -65,13 +67,26 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
 
   private def initLayout(): Unit = {
     val leftPanel = new JPanel(new BorderLayout())
+
+    val headerPanel = new JPanel(new BorderLayout())
+
     val radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT))
-    val group = new ButtonGroup();
-    group.add(openSetRadio);
+    val group = new ButtonGroup()
+    group.add(openSetRadio)
     group.add(visitedSetRadio)
-    radioPanel.add(openSetRadio);
+    radioPanel.add(openSetRadio)
     radioPanel.add(visitedSetRadio)
-    leftPanel.add(radioPanel, BorderLayout.NORTH)
+
+    val searchPanel = new JPanel(new BorderLayout())
+    searchPanel.setBorder(BorderFactory.createEmptyBorder(0, 5, 5, 5)) // Padding
+    searchPanel.add(new JLabel("Filter: "), BorderLayout.WEST)
+    searchPanel.add(searchField, BorderLayout.CENTER)
+
+    headerPanel.add(radioPanel, BorderLayout.NORTH)
+    headerPanel.add(searchPanel, BorderLayout.SOUTH)
+    // ---------------------------------------
+
+    leftPanel.add(headerPanel, BorderLayout.NORTH)
     leftPanel.add(new JScrollPane(nodeList), BorderLayout.CENTER)
     leftPanel.setPreferredSize(new Dimension(350, 0))
 
@@ -109,6 +124,12 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
     openSetRadio.addActionListener(radioListener)
     visitedSetRadio.addActionListener(radioListener)
 
+    searchField.getDocument.addDocumentListener(new DocumentListener {
+      override def insertUpdate(e: DocumentEvent): Unit = refreshNodeList()
+      override def removeUpdate(e: DocumentEvent): Unit = refreshNodeList()
+      override def changedUpdate(e: DocumentEvent): Unit = refreshNodeList()
+    })
+
     nodeList.addListSelectionListener(e => {
       if (!e.getValueIsAdjusting && nodeList.getSelectedValue != null) {
         extractAndShowExpression(nodeList.getSelectedValue)
@@ -123,6 +144,23 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
     evalButton.addActionListener(_ => performFullTreeEvaluation())
 
     expandAllButton.addActionListener(_ => expandAll(expressionTree))
+  }
+
+
+  private def refreshNodeList(): Unit = {
+    listModel.clear()
+    currentSnapshot.foreach { snap =>
+      val sourceItems = if (openSetRadio.isSelected) snap.openSetItems else snap.visitedItems
+
+      val searchText = searchField.getText.toLowerCase.trim
+      val filteredItems = if (searchText.isEmpty) {
+        sourceItems
+      } else {
+        sourceItems.filter(item => item.toString.toLowerCase.contains(searchText))
+      }
+
+      filteredItems.foreach(listModel.addElement)
+    }
   }
 
 
@@ -257,14 +295,6 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
         currentSnapshot = Some(snap)
         refreshNodeList()
       case Failure(e) => JOptionPane.showMessageDialog(this, e.getMessage)
-    }
-  }
-
-  private def refreshNodeList(): Unit = {
-    listModel.clear()
-    currentSnapshot.foreach { snap =>
-      val items = if (openSetRadio.isSelected) snap.openSetItems else snap.visitedItems
-      items.foreach(listModel.addElement)
     }
   }
 

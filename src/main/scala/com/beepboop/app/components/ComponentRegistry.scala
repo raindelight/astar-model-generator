@@ -28,6 +28,7 @@ case object MapIntToIntType extends ExpressionType
 case object ListAnyType extends ExpressionType
 case object ListRectType extends ExpressionType
 case object StringType extends ExpressionType
+case object ListSetIntType extends ExpressionType
 
 case class Signature(inputs: List[ExpressionType], output: ExpressionType)
 
@@ -41,12 +42,14 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
 
   case c if c == classOf[java.lang.Boolean] || c == java.lang.Boolean.TYPE =>
     BoolType
-
   case c if c == classOf[List[Integer]] =>
     ListIntType
 
   case c if c == classOf[Set[Int]] || classOf[Set[?]].isAssignableFrom(c) =>
     SetIntType
+
+  case c if c == classOf[List[Set[Integer]]] =>
+    ListSetIntType
 
   case c if c == classOf[List[Task]] =>
     ListTaskType
@@ -60,7 +63,6 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
   case _ =>
     throw new Exception(s"Unsupported type: ${cls.getName}")
 }
-
 
 private def toScala(value: Any): Any = value match {
   case m: java.util.Map[_, _] =>

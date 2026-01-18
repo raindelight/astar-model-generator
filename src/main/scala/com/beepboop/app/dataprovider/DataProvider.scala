@@ -21,6 +21,9 @@ sealed trait DataItemRegistry {
   def getValue(name: String): Any
 }
 
+
+
+
 object DataProvider extends LogTrait {
   var solutionCount: Int = 0
   private var solutionNumber: Int = 0
@@ -35,6 +38,14 @@ object DataProvider extends LogTrait {
   private var variableCreatables: Option[List[Creatable]] = None
   var solutionContexts: Vector[Map[String, Any]] = Vector();
 
+
+  def getExpressionType(item: DataItem): ExpressionType = {
+    val typeStr = Option(item.detailedDataType).map(_.toString.toLowerCase).getOrElse("")
+
+    if (typeStr.contains("set") && typeStr.contains("array")) ListSetIntType
+    else if (typeStr.contains("array")) ListIntType
+    else IntType
+  }
 
   def getSolutionNumber: Int = solutionNumber
 
@@ -67,16 +78,52 @@ object DataProvider extends LogTrait {
     variables.foreach(v => VarRegistry.dataVars.contains(v.name) )
 
     val groupedVars: Map[ExpressionType, List[DataItem]] = (variables ++ (ParameterRegistry.dataPars.filter(_.value != None))).groupBy { item =>
-      item.dataType match {
-        case "int" => IntType
-        case t if t.contains("array") && t.contains("int") => ListIntType
-        case "set of int" => ListIntType // todo: prepare correct SetType
-        case "bool" => BoolType
-        case _ => UnknownType
+      val value = item.value
+      val hasValue = value != null && value != None
+
+      if (hasValue) {
+        value match {
+          case _: Int | _: java.lang.Integer => IntType
+          case _: Boolean | _: java.lang.Boolean => BoolType
+          case _: Double | _: Float | _: java.lang.Double | _: java.lang.Float => IntType
+
+          case l: List[_] =>
+            if (l.nonEmpty) {
+              l.head match {
+                case _: List[_] | _: Set[_] => ListSetIntType
+                case _ => ListIntType
+              }
+            } else {
+              ListIntType
+            }
+
+          case _: Set[_] => SetIntType
+          case _ => UnknownType
+        }
+      } else {
+        val rawType = Option(item.dataType).getOrElse("").toLowerCase
+        val details = item.detailedDataType
+
+        val isBool = (details != null && details.dataType == "bool") || rawType.contains("bool")
+        val isString = (details != null && details.dataType == "string") || rawType.contains("string")
+
+        val isArray = (details != null && details.isArray) || rawType.contains("array")
+        val isSet = (details != null && details.isSet) || rawType.contains("set")
+
+        if (isArray) {
+          if (isSet) ListSetIntType
+          else if (isBool) ListAnyType
+          else if (isString) ListAnyType
+          else ListIntType
+        } else if (isSet) {
+          SetIntType
+        } else {
+          if (isBool) BoolType
+          else if (isString) StringType
+          else IntType
+        }
       }
     }
-
-
 
 
 
@@ -87,11 +134,11 @@ object DataProvider extends LogTrait {
     this.variableCreatables = Some(
       groupedVars.map {
         case (exprType, dataItems) =>
-        debug(s"Creating variableCreatables exprType $exprType, ${dataItems.map(_.name).mkString(", ")}")
-        new RandomVariableFactory(exprType, dataItems.map(_.name))
+          debug(s"Creating variableCreatables exprType $exprType, ${dataItems.map(_.name).mkString(", ")}")
+
+          new RandomVariableFactory(exprType, dataItems.map(_.name))
       }.toList
     )
-
     this.solutionContexts = (0 until solutionCount).map(createSolutionContext).toVector
   }
 

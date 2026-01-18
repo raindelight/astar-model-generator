@@ -19,7 +19,7 @@ com.beepboop.app.ge_interpreter.AStarPhenotypeGenerator:
   enabled: false
 
 com.beepboop.app.mutations.MutationEngine:
-  level: INFO
+  level: DEBUG
   enabled: true
 
 
@@ -33,7 +33,7 @@ com.beepboop.app.mutations.ReplaceOperator:
 
 com.beepboop.app.mutations.ExpressionGenerator:
   level: DEBUG
-  enabled: true
+  enabled: false
 
 
 com.beepboop.app.mutations.ReplaceSubtree:
@@ -91,3 +91,7 @@ com.beepboop.app.cpicker.Runner:
 com.beepboop.app.cpicker.ConstraintPicker:
   level: INFO
   enabled: true
+
+com.beepboop.app.components.DiffnExpression:
+  level: DEBUG
+  enabled: false

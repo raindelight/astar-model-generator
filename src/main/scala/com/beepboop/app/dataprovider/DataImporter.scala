@@ -23,12 +23,64 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
   def prepareSets(data: String, dataItems: List[DataItem]): Unit = {
     dataItems.filter(_.detailedDataType.isSet).foreach { item =>
       val expr = item.expr
+
       if (expr != "") {
-        val start = parseRange(expr)
-        println(s"set ${item.name} is ${start(0)} to ${start(1)}")
+        try {
+          val parts = parseRange(expr)
+
+          val minVal = resolveBound(parts(0), dataItems)
+          val maxVal = resolveBound(parts(1), dataItems)
+
+          val setValues = (minVal to maxVal).toList
+          item.value = setValues
+
+          info(s"Set ${item.name} resolved: $minVal..$maxVal (size: ${setValues.size})")
+        } catch {
+          case e: Exception =>
+            warn(s"Failed to resolve set '${item.name}' with expr '$expr': ${e.getMessage}")
+        }
       }
     }
+  }
 
+  def resolveBound(boundStr: String, dataItems: List[DataItem]): Int = {
+    val raw = boundStr.trim
+
+    if (raw.matches("-?\\d+")) {
+      return raw.toInt
+    }
+
+    val sumPattern = "sum\\((.*)\\)".r
+    raw match {
+      case sumPattern(varName) =>
+        val listValue = lookupDependency(varName, dataItems)
+        listValue match {
+          case l: List[_] => l.map(_.toString.toInt).sum
+          case _ => throw new IllegalArgumentException(s"Item '$varName' is not a list, cannot calculate sum.")
+        }
+
+      case varName =>
+        val value = lookupDependency(varName, dataItems)
+        value.toString.toInt
+    }
+  }
+
+  def lookupDependency(name: String, dataItems: List[DataItem]): Any = {
+    dataItems.find(d => d.name == name && !d.isVar) match {
+      case Some(foundItem) =>
+        if (foundItem.value == null || foundItem.value == None) {
+          throw new IllegalArgumentException(s"Dependency '$name' found but has no value yet.")
+        }
+        foundItem.value
+      case None =>
+        throw new IllegalArgumentException(s"Dependency '$name' not found in dataItems.")
+    }
+  }
+  def resolveValue(value: Any): Any = {
+    value match {
+      case key: String => DataProvider.getValue(key)
+      case other => other
+    }
   }
   def parseRange(expr: String): Array[String] = {
     val parts = expr.split("\\.\\.")
@@ -36,81 +88,73 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
     parts
   }
 
-  def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
-    val jsonObject = data.parseJson.asJsObject
-    if (parseVars) {
-      dataItems.filter(_.isVar).foreach { item =>
-        (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) if details != null =>
-            try {
-              val convertedValue: Any = (details.isArray, details.dataType) match {
-                case (true, "int") =>
-                  Try(jsValue.convertTo[List[List[Int]]]).getOrElse(jsValue.convertTo[List[Int]])
-                case (true, "float") =>
-                  Try(jsValue.convertTo[List[List[Double]]]).getOrElse(jsValue.convertTo[List[Double]])
-                case (true, "bool") =>
-                  Try(jsValue.convertTo[List[List[Boolean]]]).getOrElse(jsValue.convertTo[List[Boolean]])
-                case (true, "string") => jsValue.convertTo[List[String]]
-                case (false, "int") => jsValue.convertTo[Int]
-                case (false, "float") => jsValue.convertTo[Double]
-                case (false, "bool") => jsValue.convertTo[Boolean]
-                case (false, "string") => jsValue.convertTo[String]
-                case (_, unknownType) =>
-                  warn(s"Unsupported data type: $unknownType for item ${item.name}")
-                  None
-              }
-              item.value = convertedValue
-              info(s"Successfully parsed data for ${item.name}: ${item.value}")
-            } catch {
-              case e: DeserializationException =>
-                error(s"Error converting data for ${item.name}: ${e.getMessage}")
-            }
 
-          case (None, _) =>
-            warn(s"No data found for key: ${item.name}")
-
-          case (Some(_), null) =>
-            warn(s"No detailed data type found for item: ${item.name}")
-        }
-      }
-
-
-    } else {
-      dataItems.filter(!_.isVar).foreach { item =>
-        (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) if details != null =>
-            try {
-              val convertedValue: Any = (details.isArray, details.dataType) match {
-                case (true, "int") => jsValue.convertTo[List[Int]]
-                case (true, "float") => jsValue.convertTo[List[Double]]
-                case (true, "bool") => jsValue.convertTo[List[Boolean]]
-                case (true, "string") => jsValue.convertTo[List[String]]
-                case (false, "int") => jsValue.convertTo[Int]
-                case (false, "float") => jsValue.convertTo[Double]
-                case (false, "bool") => jsValue.convertTo[Boolean]
-                case (false, "string") => jsValue.convertTo[String]
-                case (_, unknownType) =>
-                  warn(s"Unsupported data type: $unknownType for item ${item.name}") // todo: add deduction based on previously defined var
-                  None
-              }
-              item.value = convertedValue
-              info(s"Successfully parsed data for ${item.name}: ${item.value}")
-            } catch {
-              case e: DeserializationException =>
-                warn(s"Error converting data for ${item.name}: ${e.getMessage}")
-            }
-
-          case (None, _) =>
-            warn(s"No data found for key: ${item.name}")
-
-          case (Some(_), null) =>
-            warn(s"No detailed data type found for item: ${item.name}")
-        }
-      }
-
-    }
+  private def extractJsonValue(jsValue: JsValue): Any = jsValue match {
+    case JsObject(fields) if fields.contains("set") =>
+      extractJsonValue(fields("set"))
+    case JsArray(elements) =>
+      elements.map(extractJsonValue).toList
+    case JsNumber(num) =>
+      if (num.isValidInt) num.toInt else num.toDouble
+    case JsBoolean(b) => b
+    case JsString(s) => s
+    case _ => throw new DeserializationException(s"Unexpected JSON format: $jsValue")
   }
 
+  def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
+    val jsonObject = data.parseJson.asJsObject
+    val targetItems = if (parseVars) dataItems.filter(_.isVar) else dataItems.filter(!_.isVar)
+
+    targetItems.foreach { item =>
+      (jsonObject.fields.get(item.name), item.detailedDataType) match {
+        case (Some(jsValue), details) if details != null =>
+          try {
+            val rawValue = extractJsonValue(jsValue)
+            val typeName = Option(details.dataType).getOrElse("int").toLowerCase
+
+            val convertedValue: Any = typeName match {
+              case t if t.contains("float") || t.contains("decimal") =>
+                rawValue match {
+                  case n: Number => n.doubleValue()
+                  case l: List[_] => l.map {
+                    case n: Number => n.doubleValue()
+                    case other => other
+                  }
+                  case other => other
+                }
+
+              case t if t.contains("bool") => rawValue
+
+              case t if t.contains("string") => rawValue
+
+              case _ =>
+                rawValue match {
+                  case n: Number => n.intValue()
+                  case l: List[_] =>
+                    if (l.isEmpty) l
+                    else {
+                      l.head match {
+                        case _: List[_] => l.asInstanceOf[List[List[Int]]]
+                        case _ =>
+                          l.map {
+                            case n: Number => n.intValue()
+                            case s: String => scala.util.Try(s.toInt).getOrElse(0)
+                            case other => other
+                          }.asInstanceOf[List[Int]]
+                      }
+                    }
+                  case other => other
+                }
+            }
+            item.value = convertedValue
+          } catch {
+            case e: Exception =>
+              warn(s"Error parsing ${item.name}: ${e.getMessage}")
+          }
+        case _ =>
+      }
+    }
+  }
   def parseDzn(data: String, dataItems: List[DataItem]): Unit = {
     try {
       val charStream = CharStreams.fromString(data)
@@ -189,30 +233,36 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
           try {
             val columnValues = dataRows.map(_.split(";").apply(colIdx).trim)
 
-            val convertedValues: List[Any] = if (item.detailedDataType != null) {
+            val isArray = if (item.detailedDataType != null) item.detailedDataType.isArray else true
+
+            val convertedValue: Any = if (item.detailedDataType != null) {
               item.detailedDataType.dataType match {
                 case "int" =>
-                  columnValues.map(_.toInt).toList
+                  val lst = columnValues.map(_.toInt).toList
+                  if (isArray) lst else lst.head
                 case "float" =>
-                  columnValues.map(_.toDouble).toList
+                  val lst = columnValues.map(_.toDouble).toList
+                  if (isArray) lst else lst.head
                 case "bool" =>
-                  columnValues.map {
-                    case "true" | "1" | "yes"  => true
-                    case "false" | "0" | "no"  => false
+                  val lst = columnValues.map {
+                    case "true" | "1" | "yes" => true
+                    case "false" | "0" | "no" => false
                     case other => throw new IllegalArgumentException(s"Cannot convert '$other' to boolean")
                   }.toList
+                  if (isArray) lst else lst.head
                 case "string" =>
-                  columnValues.toList
+                  val lst = columnValues.toList
+                  if (isArray) lst else lst.head
                 case otherType =>
                   warn(s"Unknown data type $otherType for item ${item.name}, attempting auto-detection")
-                  tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+                  tryAutoDetectType(columnValues, isArray = isArray)
               }
             } else {
               warn(s"Missing detailedDataType for item ${item.name} in CSV, attempting auto-detection")
-              tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+              tryAutoDetectType(columnValues, isArray = isArray)
             }
 
-            item.value = convertedValues
+            item.value = convertedValue
 
             info(s"Parsed CSV data for ${item.name}: ${item.value}")
 

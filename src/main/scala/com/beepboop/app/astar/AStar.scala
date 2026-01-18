@@ -37,6 +37,13 @@ case class ModelNodeTMP(
                          h: Int,
                        ) extends Serializable {
   val f: Int = g + h
+
+  override def equals(obj: Any): Boolean = obj match {
+    case that: ModelNodeTMP => this.constraint == that.constraint
+    case _ => false
+  }
+
+  override def hashCode(): Int = constraint.hashCode()
 }
 
 case class HeuristicStats(
@@ -105,57 +112,84 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
                         outputCsvFile: String
                       ): Option[mutable.Set[ModelNodeTMP]] = {
 
+    val gScore = mutable.Map[Expression[?], Int]()
+
     if (!isInitialized) {
       openSet.clear()
       visited.clear()
 
       val initial_h = calculateHeuristic(initialConstraint)
       val startNode = ModelNodeTMP(initialConstraint, 1, initial_h)
-      warn(s"Start Node: g=${startNode.g}, h=${startNode.h}, f=${startNode.f}")
+
+      gScore(initialConstraint) = 1
       openSet.enqueue(startNode)
-    }
-    else {
+
+      warn(s"Start Node: g=${startNode.g}, h=${startNode.h}, f=${startNode.f}")
+    } else {
       warn("Resuming search from loaded state...")
+      visited.values.foreach(n => gScore(n.constraint) = n.g)
+      openSet.iterator.foreach(n => {
+        val currentBest = gScore.getOrElse(n.constraint, Int.MaxValue)
+        if (n.g < currentBest) gScore(n.constraint) = n.g
+      })
     }
 
     var iterations = 0
 
     while (openSet.nonEmpty && iterations < maxIterations) {
+
       if (iterations % saveInterval == 0 && iterations > 0) {
         PersistenceManager.saveCheckpoint(getSnapshot, checkpointFile, outputCsvFile)
         warn(s"Checkpoint saved at iteration $iterations.")
       }
 
-      Some(visited)
-
-      info(s"Iteration: $iterations. Queue items: ${openSet.size}. Visited: ${visited.size}")
       iterations += 1
-      val currentNode = openSet.dequeue()
-      info(s"Dequeuing node: $currentNode")
 
-      visited(currentNode.constraint) = currentNode
-      debug(visited.toString)
-      val generated = generateNeighbors(currentNode)
-      info(s"Generated neighbors: ${generated.size}")
-      generated.foreach { neighborConstraint =>
-        if (!visited.contains(neighborConstraint)) {
-          val h = calculateHeuristic(neighborConstraint)
-          val neighbourNode = ModelNodeTMP(neighborConstraint, currentNode.g + 1, h)
-          //debug(s"Enqueuing node: $neighbourNode")
-          openSet.enqueue(neighbourNode)
+      val currentNode = openSet.dequeue()
+
+      val bestG = gScore.getOrElse(currentNode.constraint, Int.MaxValue)
+      if (currentNode.g > bestG) {
+        debug(s"Skipping stale node (g=${currentNode.g} > best=$bestG): ${currentNode.constraint}")
+      } else {
+
+        info(s"Processing Iteration $iterations | Queue: ${openSet.size} | Visited: ${visited.size}")
+        info(s"Dequeued: $currentNode")
+
+        visited(currentNode.constraint) = currentNode
+
+        val generated = generateNeighbors(currentNode)
+        info(s"Generated neighbors: ${generated.size}")
+
+        generated.foreach { neighborConstraint =>
+          val tentativeG = currentNode.g + 1
+          val existingG = gScore.getOrElse(neighborConstraint, Int.MaxValue)
+
+          if (tentativeG < existingG) {
+
+            gScore(neighborConstraint) = tentativeG
+
+            val h = calculateHeuristic(neighborConstraint)
+            val neighborNode = ModelNodeTMP(neighborConstraint, tentativeG, h)
+
+            openSet.enqueue(neighborNode)
+          }
         }
       }
     }
 
     info("Saving final state checkpoint...")
     PersistenceManager.saveCheckpoint(getSnapshot, checkpointFile, outputCsvFile)
-    info(s"Search finished after $iterations iterations.")
+
+    if (iterations >= maxIterations) {
+      warn(s"Search finished after $iterations iterations (Max Limit Reached).")
+    } else {
+      warn(s"Search finished because Queue is empty.")
+    }
+
     isInitialized = false
-    warn(s"Search finished after $iterations iterations without finding a solution.")
     val resultNodes = scala.collection.mutable.Set.from(visited.values)
     Some(resultNodes)
   }
-
   private def calculateHeuristic(constraint: Expression[?]): Int = Profiler.profile("calculateHeuristic") {
     if (numSolutions == 0) return Int.MaxValue
 
@@ -329,41 +363,41 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
 
     val neighbors = possibleMutations.flatMap {
-      case (targetNode, mutationFunc, ctx) =>
+      case (targetNode, mutationFunc, ctx, replacement) =>
 
-        mutationFunc(targetNode, ctx).flatMap { replacement =>
+        if (replacement.signature.output != targetNode.signature.output) {
+          debug(s"Type Mismatch: ${targetNode.signature.output} vs ${replacement.signature.output}")
+          None
+        } else {
+          val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
 
-          if (replacement.signature.output != targetNode.signature.output) {
-            debug(s"Type Mismatch: ${targetNode.signature.output} vs ${replacement.signature.output}")
-            None
+          val simplifiedTree = candidateTree match {
+            case expr: Expression[t] =>
+              implicit val tag: ClassTag[t] = expr.ct
+              Postprocessor.simplify(expr)
+          }
+
+          debug(s"Generated: $candidateTree to simplified $simplifiedTree")
+          val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
+
+          if (result.isAllowed) {
+            Profiler.recordValue("accepted", 1)
+            Some(simplifiedTree)
           } else {
-            val candidateTree = mutationEngine.replaceNodeInTree(constraint, targetNode, replacement)
-            val simplifiedTree = candidateTree match {
-              case expr: Expression[t] =>
-                implicit val tag: ClassTag[t] = expr.ct
-                Postprocessor.simplify(expr)
+            debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
+            Profiler.recordValue("discarded", 1)
+            result match {
+              case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
+              case _ =>
             }
-
-            debug(s"Generated: $candidateTree to simplified $simplifiedTree")
-            val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
-
-            if (result.isAllowed) {
-              Profiler.recordValue("accepted", 1)
-              Some(simplifiedTree)
-            } else {
-              debug(s"Expr: ${candidateTree.toString} - ${result.toString}")
-              Profiler.recordValue("discarded", 1)
-              result match {
-                case nc: NonCompliant => Profiler.recordValue(nc.message, 1)
-              }
-              None
-            }
+            None
           }
         }
     }
     debug(neighbors.toString)
     neighbors.toSet.toList
   }
+
 
   private def computeMinStepsHeuristic(): Map[String, Int] = {
     val costs = mutable.Map[String, Int]()

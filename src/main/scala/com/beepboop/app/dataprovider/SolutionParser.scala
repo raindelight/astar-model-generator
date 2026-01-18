@@ -101,7 +101,6 @@ object SolutionParser extends LogTrait {
       value.toInt
     }
     else {
-      value
+      scala.util.Try(value.toInt).getOrElse(value)
     }
-  }
-}
+  }}
