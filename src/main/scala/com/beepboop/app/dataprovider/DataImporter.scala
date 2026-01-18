@@ -88,81 +88,73 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
     parts
   }
 
-  def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
-    val jsonObject = data.parseJson.asJsObject
-    if (parseVars) {
-      dataItems.filter(_.isVar).foreach { item =>
-        (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) if details != null =>
-            try {
-              val convertedValue: Any = (details.isArray, details.dataType) match {
-                case (true, "int") =>
-                  Try(jsValue.convertTo[List[List[Int]]]).getOrElse(jsValue.convertTo[List[Int]])
-                case (true, "float") =>
-                  Try(jsValue.convertTo[List[List[Double]]]).getOrElse(jsValue.convertTo[List[Double]])
-                case (true, "bool") =>
-                  Try(jsValue.convertTo[List[List[Boolean]]]).getOrElse(jsValue.convertTo[List[Boolean]])
-                case (true, "string") => jsValue.convertTo[List[String]]
-                case (false, "int") => jsValue.convertTo[Int]
-                case (false, "float") => jsValue.convertTo[Double]
-                case (false, "bool") => jsValue.convertTo[Boolean]
-                case (false, "string") => jsValue.convertTo[String]
-                case (_, unknownType) =>
-                  warn(s"Unsupported data type: $unknownType for item ${item.name}")
-                  None
-              }
-              item.value = convertedValue
-              info(s"Successfully parsed data for ${item.name}: ${item.value}")
-            } catch {
-              case e: DeserializationException =>
-                error(s"Error converting data for ${item.name}: ${e.getMessage}")
-            }
 
-          case (None, _) =>
-            warn(s"No data found for key: ${item.name}")
-
-          case (Some(_), null) =>
-            warn(s"No detailed data type found for item: ${item.name}")
-        }
-      }
-
-
-    } else {
-      dataItems.filter(!_.isVar).foreach { item =>
-        (jsonObject.fields.get(item.name), item.detailedDataType) match {
-          case (Some(jsValue), details) if details != null =>
-            try {
-              val convertedValue: Any = (details.isArray, details.dataType) match {
-                case (true, "int") => jsValue.convertTo[List[Int]]
-                case (true, "float") => jsValue.convertTo[List[Double]]
-                case (true, "bool") => jsValue.convertTo[List[Boolean]]
-                case (true, "string") => jsValue.convertTo[List[String]]
-                case (false, "int") => jsValue.convertTo[Int]
-                case (false, "float") => jsValue.convertTo[Double]
-                case (false, "bool") => jsValue.convertTo[Boolean]
-                case (false, "string") => jsValue.convertTo[String]
-                case (_, unknownType) =>
-                  warn(s"Unsupported data type: $unknownType for item ${item.name}") // todo: add deduction based on previously defined var
-                  None
-              }
-              item.value = convertedValue
-              info(s"Successfully parsed data for ${item.name}: ${item.value}")
-            } catch {
-              case e: DeserializationException =>
-                warn(s"Error converting data for ${item.name}: ${e.getMessage}")
-            }
-
-          case (None, _) =>
-            warn(s"No data found for key: ${item.name}")
-
-          case (Some(_), null) =>
-            warn(s"No detailed data type found for item: ${item.name}")
-        }
-      }
-
-    }
+  private def extractJsonValue(jsValue: JsValue): Any = jsValue match {
+    case JsObject(fields) if fields.contains("set") =>
+      extractJsonValue(fields("set"))
+    case JsArray(elements) =>
+      elements.map(extractJsonValue).toList
+    case JsNumber(num) =>
+      if (num.isValidInt) num.toInt else num.toDouble
+    case JsBoolean(b) => b
+    case JsString(s) => s
+    case _ => throw new DeserializationException(s"Unexpected JSON format: $jsValue")
   }
 
+  def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
+    val jsonObject = data.parseJson.asJsObject
+    val targetItems = if (parseVars) dataItems.filter(_.isVar) else dataItems.filter(!_.isVar)
+
+    targetItems.foreach { item =>
+      (jsonObject.fields.get(item.name), item.detailedDataType) match {
+        case (Some(jsValue), details) if details != null =>
+          try {
+            val rawValue = extractJsonValue(jsValue)
+            val typeName = Option(details.dataType).getOrElse("int").toLowerCase
+
+            val convertedValue: Any = typeName match {
+              case t if t.contains("float") || t.contains("decimal") =>
+                rawValue match {
+                  case n: Number => n.doubleValue()
+                  case l: List[_] => l.map {
+                    case n: Number => n.doubleValue()
+                    case other => other
+                  }
+                  case other => other
+                }
+
+              case t if t.contains("bool") => rawValue
+
+              case t if t.contains("string") => rawValue
+
+              case _ =>
+                rawValue match {
+                  case n: Number => n.intValue()
+                  case l: List[_] =>
+                    if (l.isEmpty) l
+                    else {
+                      l.head match {
+                        case _: List[_] => l.asInstanceOf[List[List[Int]]]
+                        case _ =>
+                          l.map {
+                            case n: Number => n.intValue()
+                            case s: String => scala.util.Try(s.toInt).getOrElse(0)
+                            case other => other
+                          }.asInstanceOf[List[Int]]
+                      }
+                    }
+                  case other => other
+                }
+            }
+            item.value = convertedValue
+          } catch {
+            case e: Exception =>
+              warn(s"Error parsing ${item.name}: ${e.getMessage}")
+          }
+        case _ =>
+      }
+    }
+  }
   def parseDzn(data: String, dataItems: List[DataItem]): Unit = {
     try {
       val charStream = CharStreams.fromString(data)

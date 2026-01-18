@@ -21,6 +21,9 @@ sealed trait DataItemRegistry {
   def getValue(name: String): Any
 }
 
+
+
+
 object DataProvider extends LogTrait {
   var solutionCount: Int = 0
   private var solutionNumber: Int = 0
@@ -35,6 +38,14 @@ object DataProvider extends LogTrait {
   private var variableCreatables: Option[List[Creatable]] = None
   var solutionContexts: Vector[Map[String, Any]] = Vector();
 
+
+  def getExpressionType(item: DataItem): ExpressionType = {
+    val typeStr = Option(item.detailedDataType).map(_.toString.toLowerCase).getOrElse("")
+
+    if (typeStr.contains("set") && typeStr.contains("array")) ListSetIntType
+    else if (typeStr.contains("array")) ListIntType
+    else IntType
+  }
 
   def getSolutionNumber: Int = solutionNumber
 
@@ -75,7 +86,18 @@ object DataProvider extends LogTrait {
           case _: Int | _: java.lang.Integer => IntType
           case _: Boolean | _: java.lang.Boolean => BoolType
           case _: Double | _: Float | _: java.lang.Double | _: java.lang.Float => IntType
-          case l: List[_] => ListIntType
+
+          case l: List[_] =>
+            if (l.nonEmpty) {
+              l.head match {
+                case _: List[_] | _: Set[_] => ListSetIntType
+                case _ => ListIntType
+              }
+            } else {
+              ListIntType
+            }
+
+          case _: Set[_] => SetIntType
           case _ => UnknownType
         }
       } else {
@@ -83,16 +105,18 @@ object DataProvider extends LogTrait {
         val details = item.detailedDataType
 
         val isBool = (details != null && details.dataType == "bool") || rawType.contains("bool")
-        val isFloat = (details != null && details.dataType == "float") || rawType.contains("float") || rawType.contains("decimal")
         val isString = (details != null && details.dataType == "string") || rawType.contains("string")
 
         val isArray = (details != null && details.isArray) || rawType.contains("array")
-        val isSet = (details != null && details.isSet) || rawType.contains("set of")
+        val isSet = (details != null && details.isSet) || rawType.contains("set")
 
-        if (isArray || isSet) {
-          if (isBool) ListAnyType
+        if (isArray) {
+          if (isSet) ListSetIntType
+          else if (isBool) ListAnyType
           else if (isString) ListAnyType
           else ListIntType
+        } else if (isSet) {
+          SetIntType
         } else {
           if (isBool) BoolType
           else if (isString) StringType
@@ -103,7 +127,6 @@ object DataProvider extends LogTrait {
 
 
 
-
     groupedVars.foreach { case (exprType, dataItems) =>
       debug(s"  -> Type: $exprType, Items: ${dataItems.map(_.name).mkString(", ")}")
     }
@@ -111,11 +134,11 @@ object DataProvider extends LogTrait {
     this.variableCreatables = Some(
       groupedVars.map {
         case (exprType, dataItems) =>
-        debug(s"Creating variableCreatables exprType $exprType, ${dataItems.map(_.name).mkString(", ")}")
-        new RandomVariableFactory(exprType, dataItems.map(_.name))
+          debug(s"Creating variableCreatables exprType $exprType, ${dataItems.map(_.name).mkString(", ")}")
+
+          new RandomVariableFactory(exprType, dataItems.map(_.name))
       }.toList
     )
-
     this.solutionContexts = (0 until solutionCount).map(createSolutionContext).toVector
   }
 
