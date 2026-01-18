@@ -31,17 +31,24 @@ class MinizincModelListener(tokens: CommonTokenStream, extendedDataType: Boolean
 
     var fullType = ""
     var detailedFullType = DataType(null, false, false)
-
+    var expr = ""
     var isVar = false
+
 
     if (ctx.ti_expr_and_id().ti_expr().array_ti_expr() != null) {
      if (ctx.ti_expr_and_id().ti_expr().array_ti_expr().base_ti_expr().var_par().getText != "var")
      {
+       // not var
        fullType = textWithSpaces(ctx.ti_expr_and_id().ti_expr().array_ti_expr())
        if (ctx.ti_expr_and_id().ti_expr().array_ti_expr().base_ti_expr().base_ti_expr_tail().base_type() == null) {
          detailedFullType = DataType(textWithSpaces(ctx.ti_expr_and_id().ti_expr().array_ti_expr().base_ti_expr().base_ti_expr_tail().ident()), true, true)
        } else {
          detailedFullType = DataType(textWithSpaces(ctx.ti_expr_and_id().ti_expr().array_ti_expr().base_ti_expr().base_ti_expr_tail().base_type()), true, false)
+       }
+
+       // try to get expression for given decl Item, useful for set of int?
+       if (ctx.expr() != null) {
+         expr = ctx.expr().getText
        }
      } else {
        fullType = textWithSpaces(ctx.ti_expr_and_id().ti_expr().array_ti_expr())
@@ -60,7 +67,7 @@ class MinizincModelListener(tokens: CommonTokenStream, extendedDataType: Boolean
     } else if (ctx.ti_expr_and_id().ti_expr().base_ti_expr() != null)  {
         if (ctx.ti_expr_and_id().ti_expr().base_ti_expr().var_par().getText != "var") {
           fullType = textWithSpaces(ctx.ti_expr_and_id().ti_expr().base_ti_expr())
-          detailedFullType = DataType(textWithSpaces(ctx.ti_expr_and_id().ti_expr().base_ti_expr().base_ti_expr_tail().base_type()), false, false)
+          detailedFullType = DataType(textWithSpaces(ctx.ti_expr_and_id().ti_expr().base_ti_expr().base_ti_expr_tail().base_type()), false, false, Option(ctx.ti_expr_and_id().ti_expr().base_ti_expr().set_ti() != null).getOrElse(false))
         } else {
           fullType = textWithSpaces(ctx.ti_expr_and_id().ti_expr().base_ti_expr())
           if (ctx.ti_expr_and_id().ti_expr().base_ti_expr().base_ti_expr_tail().base_type() == null){
@@ -74,12 +81,16 @@ class MinizincModelListener(tokens: CommonTokenStream, extendedDataType: Boolean
           }
           isVar = true
         }
+
+        if (ctx.expr() != null) {
+          expr = ctx.expr().getText
+        }
     }
 
     val dataItem = if(extendedDataType){
-      DataItem(name = name, dataType = fullType, isVar = isVar, detailedDataType = detailedFullType)
+      DataItem(name = name, dataType = fullType, isVar = isVar, detailedDataType = detailedFullType, expr = expr)
     } else {
-     DataItem(name = name, dataType = fullType, isVar = isVar, detailedDataType = null)
+     DataItem(name = name, dataType = fullType, isVar = isVar, detailedDataType = null, expr = expr)
     }
     dataItemsBuffer += dataItem
   }

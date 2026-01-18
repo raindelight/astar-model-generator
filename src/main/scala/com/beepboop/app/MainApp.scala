@@ -53,6 +53,8 @@ object MainApp extends LogTrait {
       return;
     }
 
+    return
+
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
 

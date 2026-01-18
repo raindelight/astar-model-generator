@@ -18,6 +18,24 @@ import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
 
 object DataImporter extends DefaultJsonProtocol, LogTrait {
+
+
+  def prepareSets(data: String, dataItems: List[DataItem]): Unit = {
+    dataItems.filter(_.detailedDataType.isSet).foreach { item =>
+      val expr = item.expr
+      if (expr != "") {
+        val start = parseRange(expr)
+        println(s"set ${item.name} is ${start(0)} to ${start(1)}")
+      }
+    }
+
+  }
+  def parseRange(expr: String): Array[String] = {
+    val parts = expr.split("\\.\\.")
+    require(parts.length == 2, s"Invalid range format for expr: $expr")
+    parts
+  }
+
   def parseJson(data: String, dataItems: List[DataItem], parseVars: Boolean = false): Unit = {
     val jsonObject = data.parseJson.asJsObject
     if (parseVars) {
@@ -218,5 +236,6 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
       case "csv" => parseCsv(dataContent, dataItems, importVar)
       case ext => warn(s"Unsupported file extension: $ext")
     }
+    prepareSets(dataContent, dataItems)
   }
 }

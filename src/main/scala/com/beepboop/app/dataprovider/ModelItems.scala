@@ -8,6 +8,7 @@ case class DataType(
                    dataType: String,
                    isArray: Boolean,
                    isIdentifier: Boolean, // todo: isSet?
+                   isSet: Boolean = false,
                    )
 
 case class DataItem(
@@ -16,4 +17,5 @@ case class DataItem(
                      isVar: Boolean,
                      var value: Any = None,
                      detailedDataType: DataType = null,
+                     expr: String,
                    ) extends ModelItem

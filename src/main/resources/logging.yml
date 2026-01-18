@@ -84,7 +84,7 @@ com.beepboop.app.postprocessor.JoinConstants:
   enabled: false
 
 com.beepboop.app.cpicker.Runner:
-  level: INFO
+  level: DEBUG
   enabled: true
 
 
