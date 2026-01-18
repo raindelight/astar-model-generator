@@ -67,15 +67,39 @@ object DataProvider extends LogTrait {
     variables.foreach(v => VarRegistry.dataVars.contains(v.name) )
 
     val groupedVars: Map[ExpressionType, List[DataItem]] = (variables ++ (ParameterRegistry.dataPars.filter(_.value != None))).groupBy { item =>
-      item.dataType match {
-        case "int" => IntType
-        case t if t.contains("array") && t.contains("int") => ListIntType
-        case "set of int" => ListIntType // todo: prepare correct SetType
-        case "bool" => BoolType
-        case _ => UnknownType
+      val value = item.value
+      val hasValue = value != null && value != None
+
+      if (hasValue) {
+        value match {
+          case _: Int | _: java.lang.Integer => IntType
+          case _: Boolean | _: java.lang.Boolean => BoolType
+          case _: Double | _: Float | _: java.lang.Double | _: java.lang.Float => IntType
+          case l: List[_] => ListIntType
+          case _ => UnknownType
+        }
+      } else {
+        val rawType = Option(item.dataType).getOrElse("").toLowerCase
+        val details = item.detailedDataType
+
+        val isBool = (details != null && details.dataType == "bool") || rawType.contains("bool")
+        val isFloat = (details != null && details.dataType == "float") || rawType.contains("float") || rawType.contains("decimal")
+        val isString = (details != null && details.dataType == "string") || rawType.contains("string")
+
+        val isArray = (details != null && details.isArray) || rawType.contains("array")
+        val isSet = (details != null && details.isSet) || rawType.contains("set of")
+
+        if (isArray || isSet) {
+          if (isBool) ListAnyType
+          else if (isString) ListAnyType
+          else ListIntType
+        } else {
+          if (isBool) BoolType
+          else if (isString) StringType
+          else IntType
+        }
       }
     }
-
 
 
 

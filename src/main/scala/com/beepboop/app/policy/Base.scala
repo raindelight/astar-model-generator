@@ -1,6 +1,6 @@
 package com.beepboop.app.policy
 
-import com.beepboop.app.components.{BinaryExpression, ComposableExpression, Constant, DivOperator, Expression, Variable}
+import com.beepboop.app.components.*
 
 sealed trait PolicyResult {
   def isAllowed: Boolean
@@ -87,6 +87,25 @@ case class DenyDivByZero() extends LocalPolicy {
       }  else {
         Compliant
       }
+    case _ => Compliant
+  }
+}
+
+case class NoDuplicateVar() extends LocalPolicy {
+  override def message: String = s"Duplicates of variables not allowed in scope"
+
+  override def validate(node: Expression[_]): PolicyResult = node match {
+    case e: DiffnExpression =>
+      val variableNames = e.children.collect {
+        case v: Variable[_] => v.name
+      }
+
+      if (variableNames.distinct.size != variableNames.size) {
+        NonCompliant(node, message)
+      } else {
+        Compliant
+      }
+
     case _ => Compliant
   }
 }

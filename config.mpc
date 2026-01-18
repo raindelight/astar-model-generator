@@ -3,6 +3,7 @@
     "--gurobi-PoolSearchMode": 2,
     "--gurobi-PoolSolutions": 147483646,
     "--gurobi-Heuristics": 1,
+    "--gurobi-WorkLimit": 20000,
     "-O": 2,
     "output-objective": true,
     "intermediate-solutions": true

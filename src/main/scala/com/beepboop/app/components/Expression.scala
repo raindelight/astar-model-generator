@@ -4,7 +4,7 @@ import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.mutations.{ContextAwareCreatable, GenerationContext}
-import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
+import com.beepboop.app.policy.{EnsureSpecificVarExists, NoDuplicateVar, Policy}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
 
@@ -1003,6 +1003,7 @@ case class DiffnExpression(
                             dx: Expression[List[Integer]],
                             dy: Expression[List[Integer]]
                           ) extends Expression[Boolean]
+  with ScopeModifier
   with ComposableExpression {
 
   override def children: List[Expression[?]] = List(x, y, dx, dy)
@@ -1017,6 +1018,11 @@ case class DiffnExpression(
       newChildren(2).asInstanceOf[Expression[List[Integer]]],
       newChildren(3).asInstanceOf[Expression[List[Integer]]]
     )
+  }
+
+
+  override def getAdditionalPolicies: List[Policy] = {
+    List(NoDuplicateVar())
   }
 
   override def eval(context: Map[String, Any]): Boolean = {

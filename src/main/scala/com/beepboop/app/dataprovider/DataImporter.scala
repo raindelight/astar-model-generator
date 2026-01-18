@@ -23,12 +23,64 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
   def prepareSets(data: String, dataItems: List[DataItem]): Unit = {
     dataItems.filter(_.detailedDataType.isSet).foreach { item =>
       val expr = item.expr
+
       if (expr != "") {
-        val start = parseRange(expr)
-        println(s"set ${item.name} is ${start(0)} to ${start(1)}")
+        try {
+          val parts = parseRange(expr)
+
+          val minVal = resolveBound(parts(0), dataItems)
+          val maxVal = resolveBound(parts(1), dataItems)
+
+          val setValues = (minVal to maxVal).toList
+          item.value = setValues
+
+          info(s"Set ${item.name} resolved: $minVal..$maxVal (size: ${setValues.size})")
+        } catch {
+          case e: Exception =>
+            warn(s"Failed to resolve set '${item.name}' with expr '$expr': ${e.getMessage}")
+        }
       }
     }
+  }
 
+  def resolveBound(boundStr: String, dataItems: List[DataItem]): Int = {
+    val raw = boundStr.trim
+
+    if (raw.matches("-?\\d+")) {
+      return raw.toInt
+    }
+
+    val sumPattern = "sum\\((.*)\\)".r
+    raw match {
+      case sumPattern(varName) =>
+        val listValue = lookupDependency(varName, dataItems)
+        listValue match {
+          case l: List[_] => l.map(_.toString.toInt).sum
+          case _ => throw new IllegalArgumentException(s"Item '$varName' is not a list, cannot calculate sum.")
+        }
+
+      case varName =>
+        val value = lookupDependency(varName, dataItems)
+        value.toString.toInt
+    }
+  }
+
+  def lookupDependency(name: String, dataItems: List[DataItem]): Any = {
+    dataItems.find(d => d.name == name && !d.isVar) match {
+      case Some(foundItem) =>
+        if (foundItem.value == null || foundItem.value == None) {
+          throw new IllegalArgumentException(s"Dependency '$name' found but has no value yet.")
+        }
+        foundItem.value
+      case None =>
+        throw new IllegalArgumentException(s"Dependency '$name' not found in dataItems.")
+    }
+  }
+  def resolveValue(value: Any): Any = {
+    value match {
+      case key: String => DataProvider.getValue(key)
+      case other => other
+    }
   }
   def parseRange(expr: String): Array[String] = {
     val parts = expr.split("\\.\\.")
@@ -189,30 +241,36 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
           try {
             val columnValues = dataRows.map(_.split(";").apply(colIdx).trim)
 
-            val convertedValues: List[Any] = if (item.detailedDataType != null) {
+            val isArray = if (item.detailedDataType != null) item.detailedDataType.isArray else true
+
+            val convertedValue: Any = if (item.detailedDataType != null) {
               item.detailedDataType.dataType match {
                 case "int" =>
-                  columnValues.map(_.toInt).toList
+                  val lst = columnValues.map(_.toInt).toList
+                  if (isArray) lst else lst.head
                 case "float" =>
-                  columnValues.map(_.toDouble).toList
+                  val lst = columnValues.map(_.toDouble).toList
+                  if (isArray) lst else lst.head
                 case "bool" =>
-                  columnValues.map {
-                    case "true" | "1" | "yes"  => true
-                    case "false" | "0" | "no"  => false
+                  val lst = columnValues.map {
+                    case "true" | "1" | "yes" => true
+                    case "false" | "0" | "no" => false
                     case other => throw new IllegalArgumentException(s"Cannot convert '$other' to boolean")
                   }.toList
+                  if (isArray) lst else lst.head
                 case "string" =>
-                  columnValues.toList
+                  val lst = columnValues.toList
+                  if (isArray) lst else lst.head
                 case otherType =>
                   warn(s"Unknown data type $otherType for item ${item.name}, attempting auto-detection")
-                  tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+                  tryAutoDetectType(columnValues, isArray = isArray)
               }
             } else {
               warn(s"Missing detailedDataType for item ${item.name} in CSV, attempting auto-detection")
-              tryAutoDetectType(columnValues, isArray = true).asInstanceOf[List[Any]]
+              tryAutoDetectType(columnValues, isArray = isArray)
             }
 
-            item.value = convertedValues
+            item.value = convertedValue
 
             info(s"Parsed CSV data for ${item.name}: ${item.value}")
 

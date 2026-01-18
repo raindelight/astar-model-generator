@@ -18,7 +18,6 @@ class Runner(config: AppConfig) extends LogTrait {
       "--solver", "gurobi",
       "-I", currentWorkingDir,
       "--json-stream",
-      "--time-limit", "20000",
       "--param-file-no-push", "config.mpc",
       "--parallel", "1",
       "--all-solutions",
