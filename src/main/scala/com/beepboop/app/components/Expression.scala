@@ -3,6 +3,7 @@ package com.beepboop.app.components
 import com.beepboop.app.components.*
 import com.beepboop.app.dataprovider.{DataProvider, VarNameGenerator}
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.mutations.{ContextAwareCreatable, GenerationContext}
 import com.beepboop.app.policy.{EnsureSpecificVarExists, Policy}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.Implicits.integerNumeric
@@ -35,9 +36,12 @@ trait OperatorContainer {
 trait Creatable {
   def templateSignature: Signature
   def create(children: List[Expression[?]]): Expression[?]
-
 }
 
+trait AutoNamed {
+  protected def ownerClass: Class[_]
+  override def toString: String = ownerClass.getSimpleName.stripSuffix("$")
+}
 
 abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends LogTrait with Serializable {
   def toString: String
@@ -80,7 +84,7 @@ case class Constant[ReturnT : ClassTag](value: ReturnT) extends Expression[Retur
 }
 
 object Constant {
-  def asCreatable[T: ClassTag](randomValueGenerator: () => T): Creatable = new Creatable {
+  def asCreatable[T: ClassTag](randomValueGenerator: () => T): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature = {
       val outputType = scalaTypeToExprType(classTag[T].runtimeClass)
       Signature(inputs = Nil, output = outputType)
@@ -90,6 +94,55 @@ object Constant {
       require(children.isEmpty, "Constant requires no children.")
       Constant(randomValueGenerator())
     }
+
+    override def ownerClass: Class[_] = Constant.getClass
+  }
+}
+
+case class ArrayElement[ReturnT : ClassTag](
+                                           variable: Expression[List[ReturnT]],
+                                           index: Expression[Integer]
+                                           ) extends Expression[ReturnT] with ComposableExpression {
+  override def children: List[Expression[?]] = List(variable, index)
+
+  override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
+    require(newChildren.length == 2, "ArrayElement requires exactly two children.")
+    this.copy(variable = newChildren.head.asInstanceOf[Expression[List[ReturnT]]],
+      index = newChildren(1).asInstanceOf[Expression[Integer]])
+  }
+
+  override def eval(context: Map[String, Any]): ReturnT = {
+    variable.eval(context).apply(index.eval(context))
+  }
+
+  override def toString: String = s"${variable.toString}[${index.toString}]"
+  override def evalToString: String = s"${variable.toString}[${index.evalToString}]"
+
+  override def signature: Signature = {
+    val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
+    val intInputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+    val singleOutputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    Signature(inputs = List(listInputType,  intInputType), singleOutputType)
+  }
+
+}
+
+object ArrayElement {
+  def asCreatable[T: ClassTag](): Creatable = new Creatable with AutoNamed {
+    override def templateSignature: Signature = {
+      val listInputType = scalaTypeToExprType(classTag[List[T]].runtimeClass)
+      val intInputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+      val singleOutputType = scalaTypeToExprType(classTag[T].runtimeClass)
+      Signature(inputs = List(listInputType, intInputType), output = singleOutputType)
+    }
+
+    override def create(children: List[Expression[?]]): Expression[T] = {
+      require(children.length == 2, "ArrayElement requires two children.")
+      ArrayElement[T](children(0).asInstanceOf[Expression[List[T]]], children(1).asInstanceOf[Expression[Integer]])
+
+    }
+
+    override def ownerClass: Class[_] = ArrayElement.getClass
   }
 }
 
@@ -176,7 +229,7 @@ case class BinaryExpression[ReturnT : ClassTag](
 }
 
 object BinaryExpression {
-  def asCreatable[T](op: BinaryOperator[T]): Creatable = new Creatable {
+  def asCreatable[T](op: BinaryOperator[T]): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature = op.signature
     override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 2)
@@ -192,6 +245,8 @@ object BinaryExpression {
       )
       BinaryExpression(children(0).asInstanceOf[Expression[T]] , op, children(1).asInstanceOf[Expression[T]])
     }
+
+    override def ownerClass: Class[_] = BinaryExpression.getClass
   }
 }
 
@@ -225,7 +280,7 @@ case class UnaryExpression[ReturnT : ClassTag](
 }
 
 object UnaryExpression {
-  def asCreatable[T](op: UnaryOperator[T]): Creatable = new Creatable {
+  def asCreatable[T](op: UnaryOperator[T]): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature = op.signature
     override def create(children: List[Expression[?]]): Expression[T] = {
       implicit val tag: ClassTag[T] = op.ct
@@ -233,6 +288,7 @@ object UnaryExpression {
       require(children(0).signature.output == op.signature.inputs(0), s"Child output data type doesn't match required operator signature input, ${children(0).signature.output} != ${op.signature.inputs(0)} for ${op.toString}")
       UnaryExpression(children(0), op)
     }
+    override def ownerClass: Class[_] = UnaryExpression.getClass
   }
 }
 
@@ -267,7 +323,7 @@ case class SumExpression[ReturnT : Numeric : ClassTag](
 }
 
 object SumExpression {
-  object IntListSumFactory extends Creatable {
+  object IntListSumFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = IntType)
 
     override def create(children: List[Expression[?]]): Expression[?] = {
@@ -275,6 +331,8 @@ object SumExpression {
       val child = children.head.asInstanceOf[Expression[List[Integer]]]
       SumExpression[Integer](child)
     }
+
+    override protected def ownerClass: Class[_] = SumExpression.getClass
   }
 }
 
@@ -308,7 +366,7 @@ case class CountExpression(
 }
 
 object CountExpression {
-  object IntListCountFactory extends Creatable {
+  object IntListCountFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature = {
       Signature(inputs = List(ListIntType), output = IntType)
     }
@@ -318,6 +376,7 @@ object CountExpression {
       val child = children.head.asInstanceOf[Expression[List[Any]]]
       CountExpression(child)
     }
+    override protected def ownerClass: Class[_] = CountExpression.getClass
   }
 }
 
@@ -361,25 +420,40 @@ case class ForAllExpression[IterT](
 
 
 object ForAllExpression {
-  object ForAllIntListFactory extends Creatable {
+  object ForAllIntListFactory extends Creatable with AutoNamed with ContextAwareCreatable {
 
-    override def templateSignature: Signature = Signature(inputs = List(ListIntType, BoolType), output = BoolType)
+    override def templateSignature: Signature = Signature(List(ListIntType, BoolType), BoolType)
 
-    override def create(children: List[Expression[?]]): Expression[?] = {
-      require(children.length == 2)
+    // Standard create is not used by the generator anymore for this factory
+    override def create(children: List[Expression[?]]): Expression[?] =
+      throw new UnsupportedOperationException("This factory requires context-aware generation.")
 
-      val collectionExpr = children(0).asInstanceOf[Expression[List[Integer]]]
-      val bodyExpr = children(1).asInstanceOf[Expression[Boolean]]
+    override def generateExpression(
+                                     ctx: GenerationContext,
+                                     recurse: (ExpressionType, GenerationContext) => Option[Expression[?]]
+                                   ): Option[Expression[?]] = {
 
-      val iterator = IteratorDef(VarNameGenerator.generateUniqueName(), collectionExpr)
+      val collectionOpt = recurse(ListIntType, ctx).map(_.asInstanceOf[Expression[List[Integer]]])
+      if (collectionOpt.isEmpty) return None
 
-      ForAllExpression(iterator, bodyExpr)
+      val varName = VarNameGenerator.generateUniqueName("f")
+
+      val newCtx = ctx.withVariable(varName, IntType)
+
+      val bodyOpt = recurse(BoolType, newCtx).map(_.asInstanceOf[Expression[Boolean]])
+
+      if (bodyOpt.isEmpty) return None
+
+      val iterator = IteratorDef(varName, collectionOpt.get)
+      Some(ForAllExpression(iterator, bodyOpt.get))
     }
+
+    override def ownerClass: Class[_] = ForAllExpression.getClass
   }
 }
 
 
-//Based on ForAllExpression
+
 case class ExistsExpression[IterT](
                                     iteratorDef: IteratorDef[IterT],
                                     body: Expression[Boolean]
@@ -422,7 +496,7 @@ case class ExistsExpression[IterT](
 
 /* todo: based on forall add adding to context and globally unique name */
 object ExistsExpression {
-  object ExistsIntListFactory extends Creatable {
+  object ExistsIntListFactory extends Creatable with AutoNamed {
 
     override def templateSignature: Signature = Signature(inputs = List(ListAnyType, BoolType), output = BoolType)
 
@@ -436,6 +510,7 @@ object ExistsExpression {
 
       ExistsExpression(iterator, bodyExpr)
     }
+    override def ownerClass: Class[_] = ForAllExpression.getClass
   }
 }
 
@@ -479,7 +554,7 @@ case class AllDifferentExpression(
 }
 
 object AllDifferentExpression {
-  object ListAllDifferentFactory extends Creatable {
+  object ListAllDifferentFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = BoolType)
 
     override def create(children: List[Expression[?]]): Expression[?] = {
@@ -488,6 +563,7 @@ object AllDifferentExpression {
       val child = children.head.asInstanceOf[Expression[List[?]]]
       AllDifferentExpression(child)
     }
+    override def ownerClass: Class[_] = AllDifferentExpression.getClass
   }
 }
 
@@ -588,7 +664,7 @@ case class LexicographicalExpression[T : Ordering : ClassTag](
 }
 
 object LexicographicalExpression {
-  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable {
+  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature = op.signature
     override def create(children: List[Expression[?]]): Expression[?] = {
       require(children.length == 2, "LexicographicalExpression.create requires two children.")
@@ -599,6 +675,9 @@ object LexicographicalExpression {
 
       LexicographicalExpression[Integer](left, op, right)
     }
+
+    override def ownerClass: Class[_] = LexicographicalExpression.getClass
+
   }
 }
 
@@ -635,7 +714,7 @@ case class MinimumExpression[ReturnT : Numeric : ClassTag](
 
 
 object MinimumExpression {
-  object ListMinimumFactory extends Creatable {
+  object ListMinimumFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = IntType)
 
     override def create(children: List[Expression[?]]): Expression[?] = {
@@ -644,7 +723,9 @@ object MinimumExpression {
       val child = children.head.asInstanceOf[Expression[List[Integer]]]
       MinimumExpression[Integer](child)
     }
+    override def ownerClass: Class[_] = MinimumExpression.getClass
   }
+
 }
 
 case class MaximumExpression[ReturnT : Numeric : ClassTag](
@@ -679,7 +760,7 @@ case class MaximumExpression[ReturnT : Numeric : ClassTag](
 }
 
 object MaximumExpression {
-  object ListMaximumFactory extends Creatable {
+  object ListMaximumFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature = Signature(inputs = List(ListIntType), output = IntType)
 
     override def create(children: List[Expression[?]]): Expression[?] = {
@@ -688,6 +769,7 @@ object MaximumExpression {
       val child = children.head.asInstanceOf[Expression[List[Integer]]]
       MaximumExpression[Integer](child)
     }
+    override def ownerClass: Class[_] = MaximumExpression.getClass
   }
 }
 
@@ -807,7 +889,7 @@ case class CumulativeExpression(
 }
 
 object CumulativeExpression {
-  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable {
+  def asCreatable(op: BinaryOperator[Boolean]): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature =
       Signature(
         inputs = List(ListTaskType, IntType),
@@ -823,6 +905,7 @@ object CumulativeExpression {
 
       CumulativeExpression(tasksExpr, op, limitExpr)
     }
+    override def ownerClass: Class[_] = CumulativeExpression.getClass
   }
 }
 
@@ -892,7 +975,7 @@ case class GlobalCardinalityExpression(
 }
 
 object GlobalCardinalityExpression {
-  object GlobalCardinalityFactory extends Creatable {
+  object GlobalCardinalityFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature =
       Signature(
         inputs = List(ListAnyType, MapIntToIntType),
@@ -908,109 +991,131 @@ object GlobalCardinalityExpression {
 
       GlobalCardinalityExpression(listExpr, valuesExpr)
     }
+
+    override def ownerClass: Class[_] = GlobalCardinalityExpression.getClass
   }
 }
-
-
-case class RectDescriptor(
-                           x: Expression[Integer],
-                           y: Expression[Integer],
-                           width: Expression[Integer],
-                           height: Expression[Integer]
-                         ) {
-
-  override def toString: String =
-    s"RectDescriptor(${x.toString}, ${y.toString}, ${width.toString}, ${height.toString})"
-
-  def evalToString: String =
-    s"RectDescriptor(${x.evalToString}, ${y.evalToString}, ${width.evalToString}, ${height.evalToString})"
-}
-
 
 
 case class DiffnExpression(
-                            rectsExpr: Expression[List[RectDescriptor]]
+                            x: Expression[List[Integer]],
+                            y: Expression[List[Integer]],
+                            dx: Expression[List[Integer]],
+                            dy: Expression[List[Integer]]
                           ) extends Expression[Boolean]
   with ComposableExpression {
 
-  override def children: List[Expression[?]] = List(rectsExpr)
+  override def children: List[Expression[?]] = List(x, y, dx, dy)
 
   override def withNewChildren(newChildren: List[Expression[?]]): Expression[?] = {
-    require(newChildren.length == 1, "DiffnExpression requires one child.")
-    this.copy(rectsExpr = newChildren.head.asInstanceOf[Expression[List[RectDescriptor]]])
+    require(newChildren.length == 4, "DiffnExpression requires exactly four children (x, y, dx, dy) for reconstruction")
+
+
+    DiffnExpression(
+      newChildren(0).asInstanceOf[Expression[List[Integer]]],
+      newChildren(1).asInstanceOf[Expression[List[Integer]]],
+      newChildren(2).asInstanceOf[Expression[List[Integer]]],
+      newChildren(3).asInstanceOf[Expression[List[Integer]]]
+    )
   }
 
-  override def toString: String = s"diffn(${rectsExpr.toString})"
-
-  override def evalToString: String = s"diffn(${rectsExpr.evalToString})"
-
-
   override def eval(context: Map[String, Any]): Boolean = {
-    val rects = rectsExpr.eval(context)
+    val xVal = x.eval(context).map(_.intValue())
+    val yVal = y.eval(context).map(_.intValue())
+    val dxVal = dx.eval(context).map(_.intValue())
+    val dyVal = dy.eval(context).map(_.intValue())
 
+    val n = xVal.size
+    require(yVal.size == n && dxVal.size == n && dyVal.size == n, "All input arrays for diffn must have the same length")
 
-    val evaluatedRects = rects.map { rect =>
-      (
-        rect.x.eval(context).intValue(),
-        rect.y.eval(context).intValue(),
-        rect.width.eval(context).intValue(),
-        rect.height.eval(context).intValue()
+    for (i <- 0 until n; j <- (i + 1) until n) {
+      if (rectanglesOverlap(
+        xVal(i), yVal(i), dxVal(i), dyVal(i),
+        xVal(j), yVal(j), dxVal(j), dyVal(j)
+      )) {
+        return false
+      }
+    }
+    true
+  }
+
+  override def distance(context: Map[String, Any]): Int = {
+    val xVal = x.eval(context)
+    val yVal = y.eval(context)
+    val dxVal = dx.eval(context)
+    val dyVal = dy.eval(context)
+
+    val n = xVal.size
+    var totalOverlapArea = 0
+
+    for (i <- 0 until n; j <- (i + 1) until n) {
+      totalOverlapArea += intersectionArea(
+        xVal(i), yVal(i), dxVal(i), dyVal(i),
+        xVal(j), yVal(j), dxVal(j), dyVal(j)
       )
     }
 
-
-    evaluatedRects.combinations(2).forall {
-      case List((x1, y1, dx1, dy1), (x2, y2, dx2, dy2)) =>
-
-        val noOverlapX = (x1 + dx1 <= x2) || (x2 + dx2 <= x1)
-
-        val noOverlapY = (y1 + dy1 <= y2) || (y2 + dy2 <= y1)
-
-        noOverlapX || noOverlapY
-    }
+    totalOverlapArea
   }
 
 
-  override def distance(context: Map[String, Any]): Int = {
-    val rects = rectsExpr.eval(context)
-    val evaluatedRects = rects.map { r => (r.x.eval(context).intValue(), r.y.eval(context).intValue(), r.width.eval(context).intValue(), r.height.eval(context).intValue()) }
+  private def rectanglesOverlap(x1: Int, y1: Int, w1: Int, h1: Int,
+                                x2: Int, y2: Int, w2: Int, h2: Int): Boolean = {
+    if (x1 + w1 <= x2 || x2 + w2 <= x1) return false
+    if (y1 + h1 <= y2 || y2 + h2 <= y1) return false
 
-    evaluatedRects.combinations(2).map {
-      case List((x1, y1, w1, h1), (x2, y2, w2, h2)) =>
-        val xOverlap = Math.max(0, Math.min(x1 + w1, x2 + w2) - Math.max(x1, x2))
-        val yOverlap = Math.max(0, Math.min(y1 + h1, y2 + h2) - Math.max(y1, y2))
-
-        if (xOverlap > 0 && yOverlap > 0) {
-          Math.min(xOverlap, yOverlap)
-        } else {
-          0
-        }
-    }.sum
+    true
   }
 
-  override def signature: Signature = {
+  private def intersectionArea(x1: Int, y1: Int, w1: Int, h1: Int,
+                               x2: Int, y2: Int, w2: Int, h2: Int): Int = {
+    val xOverlap = Math.max(0, Math.min(x1 + w1, x2 + w2) - Math.max(x1, x2))
+    val yOverlap = Math.max(0, Math.min(y1 + h1, y2 + h2) - Math.max(y1, y2))
+
+    xOverlap * yOverlap
+  }
+
+  override def toString: String = stringWithSpaces("diffn(", x.toString, ",", y.toString, ",", dx.toString, ",", dy.toString, ")")
+
+  override def evalToString: String = stringWithSpaces("diffn(", x.evalToString, ",", y.evalToString, ",", dx.evalToString, ",", dy.evalToString, ")")
+
+  override def signature: Signature =
+    val outputType = scalaTypeToExprType(classTag[Boolean].runtimeClass)
     Signature(
-      inputs = List(ListRectType),
-      output = BoolType
-    )
-  }
+    inputs = List(
+      x.signature.output,
+      y.signature.output,
+      dx.signature.output,
+      dy.signature.output
+    ),
+    output = outputType
+  )
+
 }
 
 
 object DiffnExpression {
-  object DiffnFactory extends Creatable {
-    override def templateSignature: Signature =
+  object DiffnFactory extends Creatable with AutoNamed {
+
+    override def templateSignature: Signature = {
       Signature(
-        inputs = List(ListRectType),
+        inputs = List(ListIntType, ListIntType, ListIntType, ListIntType),
         output = BoolType
       )
+    }
 
     override def create(children: List[Expression[?]]): Expression[?] = {
-      require(children.length == 1, "DiffnExpression.create requires one child.")
+      require(children.length == 4, "DiffnExpression.create requires exactly four children (x, y, dx, dy).")
 
-      val rectsExpr = children.head.asInstanceOf[Expression[List[RectDescriptor]]]
-      DiffnExpression(rectsExpr)
+      DiffnExpression(
+        children(0).asInstanceOf[Expression[List[Integer]]],
+        children(1).asInstanceOf[Expression[List[Integer]]],
+        children(2).asInstanceOf[Expression[List[Integer]]],
+        children(3).asInstanceOf[Expression[List[Integer]]]
+      )
     }
+
+    override protected def ownerClass: Class[_] = DiffnExpression.getClass
   }
 }
 
@@ -1113,7 +1218,7 @@ case class ValuePrecedesChainExpression(
 
 object ValuePrecedesChainExpression {
 
-  object ValuePrecedesChainFactory extends Creatable {
+  object ValuePrecedesChainFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature =
       Signature(
         inputs = List(ListIntType, ListIntType),
@@ -1128,6 +1233,8 @@ object ValuePrecedesChainExpression {
 
       ValuePrecedesChainExpression(variablesExpr, valuesToPrecedeExpr)
     }
+
+    override def ownerClass: Class[_] = ValuePrecedesChainExpression.getClass
   }
 }
 
@@ -1230,7 +1337,7 @@ case class StrEqExpression(
 }
 
 object StrEqExpression {
-  object StrEqFactory extends Creatable {
+  object StrEqFactory extends Creatable with AutoNamed {
     override def templateSignature: Signature =
       Signature(
         inputs = List(StringType, StringType),
@@ -1245,5 +1352,7 @@ object StrEqExpression {
 
       StrEqExpression(s1Expr, s2Expr)
     }
+
+    override def ownerClass: Class[_] = StrEqExpression.getClass
   }
 }

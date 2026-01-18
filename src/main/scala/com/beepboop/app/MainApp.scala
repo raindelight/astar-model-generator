@@ -1,7 +1,7 @@
 package com.beepboop.app
 
 import com.beepboop.app.astar.AStar
-import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, GreaterOperator, Variable}
+import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, GreaterOperator, IntType, Variable}
 import com.beepboop.app.cpicker.{ConstraintPicker, ConstraintSaver, Runner}
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.Profiler
@@ -105,7 +105,7 @@ object MainApp extends LogTrait {
 
     ConstraintPicker.setConfig(config)
     /* vvv comment if no gurobi license present vvv */
-    ConstraintPicker.runInitial(result.get)
+    //ConstraintPicker.runInitial(result.get)
 
 
 

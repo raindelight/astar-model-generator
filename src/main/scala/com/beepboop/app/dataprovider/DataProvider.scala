@@ -85,7 +85,8 @@ object DataProvider extends LogTrait {
     }
 
     this.variableCreatables = Some(
-      groupedVars.map { case (exprType, dataItems) =>
+      groupedVars.map {
+        case (exprType, dataItems) =>
         debug(s"Creating variableCreatables exprType $exprType, ${dataItems.map(_.name).mkString(", ")}")
         new RandomVariableFactory(exprType, dataItems.map(_.name))
       }.toList

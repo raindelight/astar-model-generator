@@ -43,6 +43,8 @@ case class HeuristicStats(
                            satisfiedCount: Int,
                            totalNormalizedDistance: Double,
                            minNormalizedDistance: Double,
+                           maxNormalizedDistance: Double,
+                           sumSquaredNormalizedDistance: Double,
                            numSolutions: Int
                          )
 
@@ -154,45 +156,47 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     Some(resultNodes)
   }
 
-  private def calculateHeuristic(constraint: Expression[?]): Int = {
-    Profiler.profile("calculateHeuristic") {
-      if (numSolutions == 0) return Int.MaxValue
+  private def calculateHeuristic(constraint: Expression[?]): Int = Profiler.profile("calculateHeuristic") {
+    if (numSolutions == 0) return Int.MaxValue
 
-      val (satisfiedCount, totalNormalizedDistance, minNormalizedDistance) = (0 until numSolutions).par.map { i =>
-        try {
-          val context = DataProvider.createSolutionContext(i)
+    val(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist) = (0 until numSolutions).par.map { i =>
+      try {
+        val context = DataProvider.createSolutionContext(i)
 
-          val isSatisfied = try {
-            constraint.eval(context).asInstanceOf[Boolean]
-          } catch {
-            case _: ClassCastException => false
-            case _: Exception => false
-          }
-
-          if (isSatisfied) {
-            (1, 0.0, 0.0)
-          } else {
-            val rawDist = constraint.distance(context)
-            val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
-            (0, normDist, normDist)
-          }
-        } catch {
-          case scala.util.control.NonFatal(e) => (0, 1.0, 1.0)
+        val isSatisfied = try constraint.eval(context).asInstanceOf[Boolean] catch {
+          case _: ClassCastException => false
+          case _: Exception => false
         }
-      }.fold((0, 0.0, 1.0)) { (acc, elem) =>
-        (
-          acc._1 + elem._1,
-          acc._2 + elem._2,
-          math.min(acc._3, elem._3)
-        )
-      }
 
-      val stats = HeuristicStats(satisfiedCount, totalNormalizedDistance, minNormalizedDistance, numSolutions)
-      computeHeuristicScore(stats)
+        if (isSatisfied) (1, 0.0, 0.0, 0.0, 0.0) else {
+          val rawDist = constraint.distance(context)
+          val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
+          val sqDist = normDist * normDist
+          (0, normDist, normDist, normDist, sqDist)
+        }
+      } catch {
+        case scala.util.control.NonFatal(e) => (0, 1.0, 1.0, 0.0, 0.0)
+      }
+    }.fold((0, 0.0, 1.0, 0.0, 0.0)) { (acc, elem) =>
+      (
+        acc._1 + elem._1,
+        acc._2 + elem._2,
+        math.min(acc._3, elem._3),
+        math.max(acc._4, elem._4),
+        acc._5 + elem._5
+      )
     }
+
+    val stats = HeuristicStats(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist, numSolutions)
+    // different heuristic calculation methods; uncomment to activate, average is default
+     computeHeuristicScoreAverage(stats)      // method 1 (standard - distance average)
+    // computeHeuristicScoreMinDist(stats)      // method 2 (optimistic - min distance)
+    // computeHeuristicScoreMaxDist(stats)      // method 3 (pessimistic - max distance)
+    // computeHeuristicScoreMSE(stats)             // method 4 (squared - squared distance)
+    // computeHeuristicScoreVariance(stats)     // method 5 (variance - distance variance)
   }
 
-  private def computeHeuristicScore(stats: HeuristicStats): Int = {
+  private def computeHeuristicScoreAverage(stats: HeuristicStats): Int = {
     val beta = 2.0
     val betaSq = beta * beta
     val SCALING_FACTOR = 1000
@@ -232,6 +236,70 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     ((1.0 - fScore) * SCALING_FACTOR).toInt
   }
 
+  private def computeHeuristicScoreMaxDist(stats: HeuristicStats): Int = {
+    val beta = 2.0
+    val betaSq = beta * beta
+    val SCALING_FACTOR = 1000
+
+    val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
+
+    val closenessRate = 1.0 - stats.maxNormalizedDistance
+
+    if (satisfactionRate == 0.0 && closenessRate == 0.0) return SCALING_FACTOR
+
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val denominator = (betaSq * closenessRate) + satisfactionRate
+
+    val fScore = if (denominator == 0) 0.0 else numerator / denominator
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
+  }
+
+  private def computeHeuristicScoreMSE(stats: HeuristicStats): Int = {
+    val beta = 2.0
+    val betaSq = beta * beta
+    val SCALING_FACTOR = 1000
+
+    val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
+
+    val meanSquaredError = stats.sumSquaredNormalizedDistance / stats.numSolutions.toDouble
+    val rootMeanSquaredError = math.sqrt(meanSquaredError)
+
+    val closenessRate = 1.0 - rootMeanSquaredError
+
+    if (satisfactionRate == 0.0 && closenessRate <= 0.0) return SCALING_FACTOR
+
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val denominator = (betaSq * closenessRate) + satisfactionRate
+
+    val fScore = if (denominator == 0) 0.0 else numerator / denominator
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
+  }
+
+  private def computeHeuristicScoreVariance(stats: HeuristicStats): Int = {
+    val beta = 2.0
+    val betaSq = beta * beta
+    val SCALING_FACTOR = 1000
+
+    val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
+
+    val mean = stats.totalNormalizedDistance / stats.numSolutions.toDouble
+    val meanSq = stats.sumSquaredNormalizedDistance / stats.numSolutions.toDouble
+    val variance = math.max(0.0, meanSq - (mean * mean))
+    val stdDev = math.sqrt(variance)
+
+    val lambda = 0.5
+    val penalizedDist = math.min(1.0, mean + (lambda * stdDev))
+
+    val closenessRate = 1.0 - penalizedDist
+
+    if (satisfactionRate == 0.0 && closenessRate <= 0.0) return SCALING_FACTOR
+
+    val numerator = (1.0 + betaSq) * (closenessRate * satisfactionRate)
+    val denominator = (betaSq * closenessRate) + satisfactionRate
+
+    val fScore = if (denominator == 0) 0.0 else numerator / denominator
+    ((1.0 - fScore) * SCALING_FACTOR).toInt
+  }
 
   private def calculateGlobalHeuristic(constraints: List[Expression[?]], availableVars: List[DataItem], dataPars: List[DataItem]): Int = {
     val numSolutions = availableVars.headOption
@@ -259,9 +327,12 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     val constraint = node.constraint
 
     val possibleMutations = mutationEngine.collectPossibleMutations(constraint)
+
     val neighbors = possibleMutations.flatMap {
-      case (targetNode, mutationFunc) =>
-        mutationFunc(targetNode).flatMap { replacement =>
+      case (targetNode, mutationFunc, ctx) =>
+
+        mutationFunc(targetNode, ctx).flatMap { replacement =>
+
           if (replacement.signature.output != targetNode.signature.output) {
             debug(s"Type Mismatch: ${targetNode.signature.output} vs ${replacement.signature.output}")
             None
@@ -273,10 +344,9 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
                 Postprocessor.simplify(expr)
             }
 
-
             debug(s"Generated: $candidateTree to simplified $simplifiedTree")
             val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
-            debug(s"Expr: ${simplifiedTree.toString} - ${result.toString}")
+
             if (result.isAllowed) {
               Profiler.recordValue("accepted", 1)
               Some(simplifiedTree)
@@ -294,7 +364,6 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     debug(neighbors.toString)
     neighbors.toSet.toList
   }
-
 
   private def computeMinStepsHeuristic(): Map[String, Int] = {
     val costs = mutable.Map[String, Int]()

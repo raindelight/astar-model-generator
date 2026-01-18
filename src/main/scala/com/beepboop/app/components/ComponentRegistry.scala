@@ -10,6 +10,11 @@ import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.components.StrEqExpression.StrEqFactory
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
+import org.yaml.snakeyaml.Yaml
+
+import scala.jdk.CollectionConverters.*
+import java.io.FileInputStream
+import java.util.Map as JMap
 
 sealed trait ExpressionType
 case object IntType extends ExpressionType
@@ -46,9 +51,6 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
   case c if c == classOf[List[Task]] =>
     ListTaskType
 
-  case c if c == classOf[List[RectDescriptor]] =>
-    ListRectType
-
   case c if c == classOf[Map[Integer, Integer]] =>
     MapIntToIntType
 
@@ -59,15 +61,26 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
     throw new Exception(s"Unsupported type: ${cls.getName}")
 }
 
+
+private def toScala(value: Any): Any = value match {
+  case m: java.util.Map[_, _] =>
+    m.asScala.view.mapValues(toScala).toMap
+  case l: java.util.List[_] =>
+    l.asScala.map(toScala).toList
+  case other => other
+}
+
 object ComponentRegistry extends LogTrait {
+
   private val binaryOperators: List[BinaryOperator[?]] = List(
+    /*
     // arithmetic
     new AddOperator[Integer],
     new SubOperator[Integer],
     new MulOperator[Integer],
     //new DivOperator[Integer],
     new ModOperator[Integer],
-
+    */
 
     // relational
     new EqualOperator[Integer],
@@ -110,6 +123,10 @@ object ComponentRegistry extends LogTrait {
     Constant.asCreatable[Integer](() => scala.util.Random.nextInt(10)),
     Constant.asCreatable[Boolean](() => scala.util.Random.nextBoolean())
   )
+  private val allArrayElementFactories: List[Creatable] = List(
+    ArrayElement.asCreatable[Integer](),
+    ArrayElement.asCreatable[Boolean](),
+  )
 
   private val expressionFactories: List[Creatable] = List(
     SumExpression.IntListSumFactory,
@@ -122,24 +139,65 @@ object ComponentRegistry extends LogTrait {
     GlobalCardinalityExpression.GlobalCardinalityFactory,
     DiffnExpression.DiffnFactory,
     ValuePrecedesChainExpression.ValuePrecedesChainFactory,
-    StrEqExpression.StrEqFactory
+    StrEqExpression.StrEqFactory,
     //CumulativeExpression
     //LexicographicalExpression.asCreatable()
   )
 
-  val creatables: List[Creatable] =
-        binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
-        unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
-        allConstantFactories ++
-        allVariablesFactories ++
-        expressionFactories
+  private def toScala(value: Any): Any = value match {
+    case m: java.util.Map[_, _] =>
+      m.asScala.view.mapValues(toScala).toMap
+    case l: java.util.List[_] =>
+      l.asScala.map(toScala).toList
+    case other => other
+  }
+
+  private val configFile = "src/main/resources/expressions.yml"
+  private lazy val creatablesConfig: Map[String, Double] = {
+    val yaml = new Yaml()
+    val input = new FileInputStream(configFile)
+    try {
+      val javaData = yaml.load[java.util.Map[String, Object]](input)
+
+      def toDouble(obj: Object): Double = obj match {
+        case d: java.lang.Double => d.doubleValue()
+        case i: java.lang.Integer => i.doubleValue()
+        case b: java.lang.Boolean => if (b) 1.0 else 0.0
+        case _ => 0.0
+      }
+
+      javaData.asScala.toMap.map { case (k, v) =>
+        k -> toDouble(v)
+      }
+    } finally {
+      input.close()
+    }
+  }
+
+
+  val creatables: List[Creatable] = (
+    binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
+      unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
+      allConstantFactories ++
+      allVariablesFactories ++
+      expressionFactories ++
+      allArrayElementFactories
+    ).filter(c =>
+    creatablesConfig.getOrElse(c.toString, 0.0) > 0.0
+  )
+
   debug(s"creatables: $creatables")
 
+  def getWeight(c: Creatable): Double = {
+    creatablesConfig.getOrElse(c.toString, 1.0)
+  }
 
 
   def findCreatablesReturning(outputType: ExpressionType): List[Creatable] = {
     creatables.filter(_.templateSignature.output == outputType)
   }
+
+
 
   def findOperatorReturning(outputType: ExpressionType): List[Operator[?]] = {
     allOperators.filter(_.signature.output == outputType)

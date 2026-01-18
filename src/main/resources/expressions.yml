@@ -1,0 +1,6 @@
+BinaryExpression: 1.0
+Constant: 10.0
+Variable: 10.0
+ForAllExpression: 20.0
+ExistsExpression: 0.0
+DiffnExpression: 1.0

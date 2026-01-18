@@ -8,7 +8,7 @@ import com.beepboop.app.logger.LogTrait
 
 trait Mutation extends LogTrait {
   def name: String
-  def apply(expression: Expression[?]): Option[Expression[?]]
+  def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]]
 }
 
 
@@ -16,7 +16,7 @@ trait Mutation extends LogTrait {
 object ReplaceOperator extends Mutation {
   override def name: String = "ReplaceOperator"
 
-  override def apply(expression: Expression[?]): Option[Expression[?]] = {
+  override def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]] = {
     expression match {
       case container: OperatorContainer =>
         val compatibleOps = ComponentRegistry
@@ -40,7 +40,7 @@ object ReplaceOperator extends Mutation {
 object TransformVariableToConstant extends Mutation {
   override def name: String = "TransformVariableToConstant"
 
-  override def apply(expression: Expression[?]): Option[Expression[?]] = {
+  override def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]] = {
     expression match {
       case v: Variable[?] =>
         val requiredType = v.signature.output
@@ -58,7 +58,7 @@ object TransformConstantToVariable extends Mutation {
   override def name: String = "TransformVariableToConstant"
 
 
-  override def apply(expression: Expression[?]): Option[Expression[?]] = {
+  override def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]] = {
     expression match {
       case c: Constant[?] =>
 
@@ -81,7 +81,7 @@ object TransformConstantToVariable extends Mutation {
 object ChangeVariable extends Mutation {
   override def name: String = "ChangeVariable"
 
-  override def apply(expression: Expression[?]): Option[Expression[?]] = {
+  override def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]] = {
     expression match {
       case v: Variable[?] =>
         val requiredType = v.signature.output
@@ -111,10 +111,10 @@ object ChangeVariable extends Mutation {
 class ReplaceSubtree(val maxDepth: Int) extends Mutation {
   override def name: String = "ReplaceSubtree"
 
-  override def apply(expression: Expression[?]): Option[Expression[?]] = {
+  override def apply(expression: Expression[?], ctx: GenerationContext): Option[Expression[?]] = {
     val requiredType = expression.signature.output
 
-    val generated = ExpressionGenerator.generate(requiredType, maxDepth = maxDepth)
+    val generated = ExpressionGenerator.generate(requiredType, maxDepth = maxDepth, ctx)
     debug(s"generated expressions are: $generated")
     generated
 
