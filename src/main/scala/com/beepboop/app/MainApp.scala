@@ -45,7 +45,7 @@ object MainApp extends LogTrait {
     DataProvider.initalize(
       config.modelPath,
       config.dataPath,
-      config.solutionsPath.getOrElse("models/accap_sols_a10.csv")
+      config.solutionsPath
     )
     if (config.debug) {
       info("--- Launching Visual Debugger ---")
