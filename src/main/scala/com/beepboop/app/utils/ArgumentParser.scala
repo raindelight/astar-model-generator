@@ -19,6 +19,9 @@ case class GeneratorConfig(
                             @arg(doc = "How often to save checkpoint/CSV")
                             saveInterval: Int = 100,
 
+                            @arg(name = "heuristic", short = 'e', doc = "Heuristic method: avg (default), min, max, mse, var")
+                            heuristic: String = "avg",
+
                             @arg(short = 'o', doc = "Output CSV file path")
                             outputCsv: String = "generated_constraints.csv",
 
@@ -41,6 +44,7 @@ case class AppConfig(
                       solutionsPath: Option[String],
                       maxIterations: Int,
                       saveInterval: Int,
+                      heuristic: String,
                       outputCsv: String,
                       checkpointFile: String,
                       resume: Boolean,
@@ -94,6 +98,7 @@ object ArgumentParser {
           solutionsPath = cli.solutionsPath.headOption,
           maxIterations = cli.maxIterations,
           saveInterval = cli.saveInterval,
+          heuristic = cli.heuristic,
           outputCsv = cli.outputCsv,
           checkpointFile = cli.checkpointFile,
           resume = cli.resume.value,
