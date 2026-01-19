@@ -4,7 +4,7 @@
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
     <module name="minizinc-model-generator" />
-    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/community-detection/community-detection.mzn models/mznc2024_probs/community-detection/Zakhary.s12.k3.dzn -s models/community.s12.k3.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
+    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/community-detection/community-detection.mzn -D models/mznc2024_probs/community-detection/Zakhary.s12.k3.dzn -s models/community.s12.k3.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

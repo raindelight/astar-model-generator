@@ -2,7 +2,7 @@
   <configuration default="false" name="Debug" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
     <module name="minizinc-model-generator" />
-    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/accap/accap.mzn models/mznc2024_probs/accap/accap_a10_f80_t50.json -s models/accap_sols_a10.csv --debug" />
+    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/accap/accap.mzn -D models/mznc2024_probs/accap/accap_a10_f80_t50.json -s models/accap_sols_a10.csv --debug" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="com.beepboop.app.*" />

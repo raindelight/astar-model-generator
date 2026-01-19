@@ -7,8 +7,8 @@ case class GeneratorConfig(
                             @arg(positional = true, doc = "Path to the .mzn model file")
                             modelPath: String,
 
-                            @arg(positional = true, doc = "Path to the .json/.dzn data file")
-                            dataPath: String,
+                            @arg(name = "data", short = 'D', doc = "Paths to .json/.dzn data files (repeat for multiple)")
+                            dataPaths: Seq[String],
 
                             @arg(name = "solutions", short = 's', doc = "Path to the known solutions CSV")
                             solutionsPath: Seq[String],
@@ -40,8 +40,8 @@ case class GeneratorConfig(
 
 case class AppConfig(
                       modelPath: String,
-                      dataPath: String,
-                      solutionsPath: Option[String],
+                      dataPath: List[String],
+                      solutionsPath: List[String],
                       maxIterations: Int,
                       saveInterval: Int,
                       heuristic: String,
@@ -94,8 +94,8 @@ object ArgumentParser {
       case Right(cli) =>
         Some(AppConfig(
           modelPath = cli.modelPath,
-          dataPath = cli.dataPath,
-          solutionsPath = cli.solutionsPath.headOption,
+          dataPath = cli.dataPaths.toList,
+          solutionsPath = cli.solutionsPath.toList,
           maxIterations = cli.maxIterations,
           saveInterval = cli.saveInterval,
           heuristic = cli.heuristic,
