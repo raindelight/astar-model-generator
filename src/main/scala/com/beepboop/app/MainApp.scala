@@ -57,7 +57,8 @@ object MainApp extends LogTrait {
     info("\n--- Step 2: Invoking Mutation Engine ---")
     val mutationEngine = new MutationEngine(AllMutations.mutations)
 
-    val searcher = new AStar(internalGrammar)
+    info(s"Initializing A* Search with heuristic mode: ${config.heuristic}")
+    val searcher = new AStar(internalGrammar, config.heuristic)
 
     if (config.resume) {
       info(s"Attempting to resume from ${config.checkpointFile}...")

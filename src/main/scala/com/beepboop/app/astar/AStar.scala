@@ -78,7 +78,7 @@ object DerivationNodeOrdering extends Ordering[DerivationNode] {
 }
 
 
-class AStar(grammar: ParsedGrammar) extends LogTrait {
+class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTrait {
   private val numSolutions = DataProvider.solutionCount
   private val mutationEngine = new MutationEngine(AllMutations.mutations)
 
@@ -222,12 +222,16 @@ class AStar(grammar: ParsedGrammar) extends LogTrait {
     }
 
     val stats = HeuristicStats(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist, numSolutions)
-    // different heuristic calculation methods; uncomment to activate, average is default
-     computeHeuristicScoreAverage(stats)      // method 1 (standard - distance average)
-    // computeHeuristicScoreMinDist(stats)      // method 2 (optimistic - min distance)
-    // computeHeuristicScoreMaxDist(stats)      // method 3 (pessimistic - max distance)
-    // computeHeuristicScoreMSE(stats)             // method 4 (squared - squared distance)
-    // computeHeuristicScoreVariance(stats)     // method 5 (variance - distance variance)
+    heuristicMode.toLowerCase match {
+      case "min" => computeHeuristicScoreMinDist(stats) // min distance - optimistic
+      case "max" => computeHeuristicScoreMaxDist(stats) // max distance - pessimistic
+      case "mse" => computeHeuristicScoreMSE(stats) // mean squared error
+      case "var" => computeHeuristicScoreVariance(stats) // distance variance
+      case "avg" => computeHeuristicScoreAverage(stats) // distance average - default
+      case other =>
+        warn(s"Unknown heuristic mode '$other', defaulting to 'avg'.")
+        computeHeuristicScoreAverage(stats)
+    }
   }
 
   private def computeHeuristicScoreAverage(stats: HeuristicStats): Int = {
