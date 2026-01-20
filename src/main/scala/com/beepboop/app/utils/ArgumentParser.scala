@@ -2,7 +2,6 @@ package com.beepboop.app.utils
 
 import mainargs.{arg, ParserForClass, Flag}
 
-// 1. Konfiguracja CLI
 case class GeneratorConfig(
                             @arg(positional = true, doc = "Path to the .mzn model file")
                             modelPath: String,
