@@ -1,6 +1,7 @@
 import subprocess
 import os
 from pathlib import Path
+import datetime
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -50,8 +51,8 @@ def run_experiment():
     total_experiments = len(PROBLEMS) * len(ITERATIONS) * len(HEURISTICS)
     current_experiment = 0
 
-    print(f"#### rozpoczynam testy: {total_experiments} przebiegów ####")
-    print(f"katalog domowy wykryto jako: {USER_HOME}")
+    print(f"#### rozpoczynam testy: {total_experiments} przebiegów #### {datetime.datetime.now()} ####")
+    print(f"katalog domowy: {USER_HOME}")
     print(f"licencja Gurobi: {GUROBI_LICENSE}")
 
     for prob_name, paths in PROBLEMS.items():
@@ -60,7 +61,11 @@ def run_experiment():
                 current_experiment += 1
 
                 base_name = f"{prob_name}_{heuristic}_i{iter_count}"
+
                 output_csv_path = os.path.join(RESULTS_DIR, f"{base_name}.csv")
+
+                picked_csv_path = os.path.join(RESULTS_DIR, f"{base_name}_picked.csv")
+
                 checkpoint_path = os.path.join(RESULTS_DIR, f"{base_name}.bin")
 
                 print(f"\n[{current_experiment}/{total_experiments}] Problem: {prob_name} | Iter: {iter_count} | Heur: {heuristic}")
@@ -72,11 +77,13 @@ def run_experiment():
                     f'-i {iter_count} '
                     f'-e {heuristic} '
                     f'-o "{output_csv_path}" '
+                    f'-p "{picked_csv_path}" '
                     f'-c "{checkpoint_path}" '
                     f'--gurobi-license "{GUROBI_LICENSE}"'
                 )
 
                 full_command = f'sbt "{sbt_args}"'
+
                 try:
                     subprocess.run(full_command, shell=True, cwd=PROJECT_ROOT, check=True)
                 except subprocess.CalledProcessError as e:

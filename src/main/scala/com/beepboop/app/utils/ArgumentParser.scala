@@ -21,8 +21,12 @@ case class GeneratorConfig(
                             @arg(name = "heuristic", short = 'e', doc = "Heuristic method: avg (default), min, max, mse, var")
                             heuristic: String = "avg",
 
-                            @arg(short = 'o', doc = "Output CSV file path")
+                            @arg(short = 'o', doc = "Output CSV file path for A* generated constraints")
                             outputCsv: String = "generated_constraints.csv",
+
+                            // NOWY PARAMETR
+                            @arg(name = "picked-output", short = 'p', doc = "Output CSV file path for picked constraints (final result)")
+                            pickedOutputCsv: String = "picked_constraints.csv",
 
                             @arg(short = 'c', doc = "Checkpoint file path")
                             checkpointFile: String = "astar_checkpoint.bin",
@@ -45,6 +49,7 @@ case class AppConfig(
                       saveInterval: Int,
                       heuristic: String,
                       outputCsv: String,
+                      pickedOutputCsv: String, // Dodano pole do konfiguracji aplikacji
                       checkpointFile: String,
                       resume: Boolean,
                       debug: Boolean,
@@ -99,6 +104,7 @@ object ArgumentParser {
           saveInterval = cli.saveInterval,
           heuristic = cli.heuristic,
           outputCsv = cli.outputCsv,
+          pickedOutputCsv = cli.pickedOutputCsv,
           checkpointFile = cli.checkpointFile,
           resume = cli.resume.value,
           debug = cli.debug.value,
