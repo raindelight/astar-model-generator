@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Concert" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="21" />
-    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
-    <module name="minizinc-model-generator" />
-    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/concert-hall-cap/concert-hall-cap.mzn -D models/mznc2024_probs/concert-hall-cap/concert_60_50.json -s models/concert.60_50.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
+    <configuration default="false" name="Run Concert" type="Application" factoryName="Application">
+        <option name="ALTERNATIVE_JRE_PATH" value="21" />
+        <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+        <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
+        <module name="minizinc-model-generator" />
+        <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/concert-hall-cap/concert-hall-cap.mzn -D models/mznc2024_probs/concert-hall-cap/concert_60_50.json -s models/concert.60_50.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
+        <method v="2">
+            <option name="Make" enabled="true" />
+        </method>
+    </configuration>
 </component>

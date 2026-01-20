@@ -1,12 +1,12 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Hoist" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="21" />
-    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
-    <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
-    <module name="minizinc-model-generator" />
-    <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/hoist-benchmark/hoist-benchmark.mzn -D models/mznc2024_probs/hoist-benchmark/PU_2_2_3.dzn -s models/hoist.2_2_3.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
-    <method v="2">
-      <option name="Make" enabled="true" />
-    </method>
-  </configuration>
+    <configuration default="false" name="Run Hoist" type="Application" factoryName="Application">
+        <option name="ALTERNATIVE_JRE_PATH" value="21" />
+        <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+        <option name="MAIN_CLASS_NAME" value="com.beepboop.app.MainApp" />
+        <module name="minizinc-model-generator" />
+        <option name="PROGRAM_PARAMETERS" value="models/mznc2024_probs/hoist-benchmark/hoist-benchmark.mzn -D models/mznc2024_probs/hoist-benchmark/PU_2_2_3.dzn -s models/hoist.2_2_3.csv -i 30 --gurobi-license $USER_HOME$/development/gurobi.lic" />
+        <method v="2">
+            <option name="Make" enabled="true" />
+        </method>
+    </configuration>
 </component>
