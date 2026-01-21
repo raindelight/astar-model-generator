@@ -220,7 +220,31 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
         acc._5 + elem._5
       )
     }
+    val noiseSamples = 200
+    val noiseSatisfiedCount = (0 until noiseSamples).count { _ =>
+      try {
+        val noiseCtx = DataProvider.createRandomContext()
+        val t = constraint.eval(noiseCtx).asInstanceOf[Boolean]
+        Profiler.recordValue("No Exception in noise sampling", 1)
+        t
+      } catch {
+        case e: Exception => {
+          //warn(e.getMessage)
+          Profiler.recordValue("Exception in noise sampling", 1)
+          true
+        }
+      }
+    }
 
+    val noiseRate = noiseSatisfiedCount.toDouble / noiseSamples
+    val entropyWeight = math.max(0.1, 1.0 - noiseRate)
+
+    if (noiseRate > 0.95) {
+      Profiler.recordValue("tautology_detected", 1)
+      debug(s"Tautology Detected: $constraint (Noise Rate: $noiseRate)")
+    } else if (entropyWeight < 0.5) {
+      Profiler.recordValue("low_entropy_penalty", 1)
+    }
     val stats = HeuristicStats(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist, numSolutions)
     heuristicMode.toLowerCase match {
       case "min" => computeHeuristicScoreMinDist(stats) // min distance - optimistic

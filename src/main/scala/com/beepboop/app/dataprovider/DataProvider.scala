@@ -1,9 +1,12 @@
 package com.beepboop.app.dataprovider
 
 /* third party modules */
+import com.beepboop.app.dataprovider.DataImporter.resolveBound
+import com.beepboop.app.logger.Profiler
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 
+import scala.util.Random
 import javax.lang.model.util.Elements.Origin
 import scala.io.Source
 
@@ -17,12 +20,14 @@ import com.beepboop.app.logger.LogTrait
 import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser, NewMinizincParserBaseListener}
 
 
+
 sealed trait DataItemRegistry {
   def getValue(name: String): Any
 }
 
 
 object DataProvider extends LogTrait {
+  private val rand = new Random()
   var solutionCount: Int = 0
 
   private var solutionNumber: Int = 0
@@ -38,6 +43,65 @@ object DataProvider extends LogTrait {
 
   def setSolutionNumber(n: Int): Unit = {
     if (n >= 0 && n < solutionContexts.size) solutionNumber = n
+  }
+
+
+  def createRandomContext(): Map[String, Any] = {
+    val allItems = variables ++ parameters
+
+    allItems.map { item =>
+      val randomValue = generateRandomValue(item)
+      item.name -> randomValue
+    }.toMap
+  }
+
+  private def generateRandomValue(item: DataItem): Any = {
+    val exprType = getExpressionType(item)
+
+    exprType match {
+      case IntType =>
+        getRandomInt(item)
+
+      case BoolType =>
+        rand.nextBoolean()
+
+      case ListIntType =>
+        val listSize = getCollectionSize(item)
+        List.fill(listSize)(rand.nextInt(100) - 50)
+
+      case SetIntType =>
+        val setSize = rand.nextInt(5) + 1
+        List.fill(setSize)(rand.nextInt(100)).toSet
+
+      case _ =>
+        0
+    }
+  }
+
+  private def getRandomInt(item: DataItem): Int = {
+    if (item.expr != null && item.expr.contains("..")) {
+      try {
+        val bounds = item.expr.split("\\.\\.")
+        val allItems = variables ++ parameters
+        val min = resolveBound(bounds(0), allItems)
+        val max = resolveBound(bounds(1), allItems)
+
+        if (max > min) rand.nextInt(max - min + 1) + min
+        else min
+      } catch {
+        case _: Exception =>
+          //Profiler.recordValue(s"RandomInt Resolution Fail: ${item.name}", 1)
+          rand.nextInt(100)
+      }
+    } else {
+      rand.nextInt(100)
+    }
+  }
+  private def getCollectionSize(item: DataItem): Int = {
+    solutionContexts.headOption.flatMap(_.get(item.name)) match {
+      case Some(l: List[_]) => l.size
+      case _ => 5
+    }
   }
 
   def createSolutionContext(solutionIndex: Int): Map[String, Any] = {

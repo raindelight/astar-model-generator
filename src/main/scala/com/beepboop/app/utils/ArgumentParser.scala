@@ -24,7 +24,6 @@ case class GeneratorConfig(
                             @arg(short = 'o', doc = "Output CSV file path for A* generated constraints")
                             outputCsv: String = "generated_constraints.csv",
 
-                            // NOWY PARAMETR
                             @arg(name = "picked-output", short = 'p', doc = "Output CSV file path for picked constraints (final result)")
                             pickedOutputCsv: String = "picked_constraints.csv",
 
@@ -36,6 +35,12 @@ case class GeneratorConfig(
 
                             @arg(name = "debug", short = 'd', doc = "Launch Visual Debugger GUI instead of running search")
                             debug: Flag,
+
+                            @arg(name = "analyze", short = 'A', doc = "Launch constraint similarity analyzer")
+                            analyze: Flag,
+                          
+                            @arg(name = "analyze-model", doc = "Class implementing target model")
+                            analyzeModel: String = "nothing",
 
                             @arg(name = "gurobi-license", doc = "Path to gurobi license file")
                             gurobiLicense: String = ""
@@ -49,11 +54,13 @@ case class AppConfig(
                       saveInterval: Int,
                       heuristic: String,
                       outputCsv: String,
-                      pickedOutputCsv: String, // Dodano pole do konfiguracji aplikacji
+                      pickedOutputCsv: String,
                       checkpointFile: String,
                       resume: Boolean,
                       debug: Boolean,
-                      gurobiLicense: String
+                      gurobiLicense: String,
+                      analyze: Boolean,
+                      analyzeModel: String
                     )
 
 object ArgumentParser {
@@ -108,7 +115,9 @@ object ArgumentParser {
           checkpointFile = cli.checkpointFile,
           resume = cli.resume.value,
           debug = cli.debug.value,
-          gurobiLicense = cli.gurobiLicense
+          gurobiLicense = cli.gurobiLicense,
+          analyze = cli.analyze.value,
+          analyzeModel = cli.analyzeModel
         ))
 
       case Left(errorMsg) =>
