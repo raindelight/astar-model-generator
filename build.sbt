@@ -13,6 +13,7 @@ libraryDependencies += "io.spray" %%  "spray-json" % "1.3.6"
 libraryDependencies += "org.yaml" % "snakeyaml" % "2.2"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 libraryDependencies += "com.lihaoyi" %% "mainargs" % "0.7.6"
+libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.13.8"
 
 javacOptions ++= Seq("-source", "21", "-target", "21")
 

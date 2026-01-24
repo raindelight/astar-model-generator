@@ -234,7 +234,7 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
 
 
   private def performFullTreeEvaluation(): Unit = {
-    val evalCtx = buildContextFromTable()
+    val baseEvalCtx = buildContextFromTable()
     val nodeEnum = treeRoot.breadthFirstEnumeration()
 
     while (nodeEnum.hasMoreElements) {
@@ -242,9 +242,11 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
 
       uiNode.getUserObject match {
         case wrapper: NodeWrapper =>
+          val activeCtx = injectIteratorScope(uiNode, baseEvalCtx)
+
           wrapper.evalResult = try {
             val m = wrapper.obj.getClass.getMethod("eval", classOf[Map[String, Any]])
-            val res = m.invoke(wrapper.obj, evalCtx)
+            val res = m.invoke(wrapper.obj, activeCtx)
             res match {
               case b: Boolean => if (b) "true" else "false"
               case other => other.toString
@@ -252,21 +254,32 @@ class DebuggerPanel extends JPanel(new BorderLayout()) {
           } catch {
             case _: Exception => "?"
           }
-
-          wrapper.distResult = try {
-            val m = wrapper.obj.getClass.getMethod("distance", classOf[Map[String, Any]])
-            val res = m.invoke(wrapper.obj, evalCtx)
-            res.toString
-          } catch {
-            case _: Exception => "?"
-          }
-
         case _ =>
       }
     }
-
     treeModel.reload()
-    statusLabel.setText("Updated Eval and Distance.")
+  }
+
+  private def injectIteratorScope(current: DefaultMutableTreeNode, ctx: Map[String, Any]): Map[String, Any] = {
+    var tempCtx = ctx
+    var curr = current.getParent
+
+    while (curr != null) {
+      val pNode = curr.asInstanceOf[DefaultMutableTreeNode].getUserObject
+      pNode match {
+        case w: NodeWrapper if w.obj.isInstanceOf[com.beepboop.app.components.ForAllExpression[_]] =>
+          val forAll = w.obj.asInstanceOf[com.beepboop.app.components.ForAllExpression[Any]]
+          try {
+            val (varName, items) = forAll.iteratorDef.eval(ctx)
+            if (items.nonEmpty) tempCtx = tempCtx + (varName -> items.head)
+          } catch {
+            case _: Exception =>
+          }
+        case _ =>
+      }
+      curr = curr.getParent
+    }
+    tempCtx
   }
 
   private def buildContextFromTable(): Map[String, Any] = {

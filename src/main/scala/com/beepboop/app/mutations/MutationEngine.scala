@@ -6,22 +6,22 @@ import com.beepboop.app.logger.LogTrait
 
 object AllMutations {
   val mutations: List[Mutation] = List(
-    //ReplaceOperator,
-    //TransformVariableToConstant,
-    //TransformConstantToVariable,
-    //ChangeVariable,
+    ReplaceOperator,
+    TransformVariableToConstant,
+    TransformConstantToVariable,
+    ChangeVariable,
     ReplaceSubtree(1),
-    //ReplaceSubtree(2),
-    //ReplaceSubtree(3),
-    //ReplaceSubtree(4),
-    GenerateAllDiffn
+    ReplaceSubtree(2),
+    ReplaceSubtree(3),
+    ReplaceSubtree(4),
+    //GenerateAllDiffn
   )
 
   val directory: Map[String, Mutation] = mutations.map(m => m.name -> m).toMap
 }
 
-
 class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
+
   def mutate(tree: Expression[?]): Expression[?] = {
     val allPossibleMutations = collectPossibleMutations(tree)
 
@@ -29,8 +29,14 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
       warn("No possible mutations found")
       tree
     } else {
-      val (nodeToReplace, mutationToApply, contextForNode, selectedVariant) = allPossibleMutations(
-        scala.util.Random.nextInt(allPossibleMutations.length)
+      val groupedOpportunities = allPossibleMutations.groupBy { case (node, mutation, _, _) =>
+        (System.identityHashCode(node), mutation)
+      }.values.toList
+
+      val selectedGroup = groupedOpportunities(scala.util.Random.nextInt(groupedOpportunities.length))
+
+      val (nodeToReplace, mutationToApply, contextForNode, selectedVariant) = selectedGroup(
+        scala.util.Random.nextInt(selectedGroup.length)
       )
 
       info(s"Applying mutation '${mutationToApply.name}' to node '$nodeToReplace'")
@@ -46,19 +52,21 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
 
     val mutationsForThisNode = activeMutations.flatMap { mutation =>
       val variants = mutation(current, ctx)
-
       variants.map { variant =>
         (current, mutation, ctx, variant)
       }
     }
 
-    debug(s"Mutations available for node ${current.toString}: ${mutationsForThisNode.map(_._2.name)}")
+    if (mutationsForThisNode.nonEmpty) {
+      val names = mutationsForThisNode.map(_._2.name).distinct.mkString(", ")
+      debug(s"Mutations available for node ${current.toString}: $names")
+    }
 
     val mutationsForChildren = current match {
       case f: ForAllExpression[?] =>
         val listType = f.iteratorDef.collection.signature.output
         val innerType = listType match {
-          case ListIntType => IntType
+          case ListIntType | ListSetIntType => IntType
           case _ => UnknownType
         }
 

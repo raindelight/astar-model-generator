@@ -1,7 +1,7 @@
 package com.beepboop.app
 
 import com.beepboop.app.astar.AStar
-import com.beepboop.app.components.{BinaryExpression, BoolType, ComponentRegistry, Constant, EqualOperator, Expression, GreaterOperator, IntType, Variable}
+import com.beepboop.app.components.*
 import com.beepboop.app.cpicker.{ConstraintPicker, ConstraintSaver, Runner}
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.Profiler
@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStream, CharStreams, CommonTokenStream, TokenStream}
 import com.beepboop.app.dataprovider.PersistenceManager
+import com.beepboop.app.experiment.{ModelLoader, MultiTargetMetricReporter, SimilarityCSVExporter}
 import com.beepboop.app.utils.AppConfig
 import debugger.VisualDebugger
 //import com.beepboop.app.utils.{GeneratorConfig, ArgumentParser}
@@ -39,6 +40,28 @@ object MainApp extends LogTrait {
     info(s"Checkpoint File: ${config.checkpointFile}")
     info(s"Resume mode: ${config.resume}")
     info("Loading parsed constraint grammar...")
+
+
+    if (config.analyze) {
+      info("--- Launching similarity analyzer ---")
+      val targetModel = ModelLoader.loadModel(config.analyzeModel)
+      val reporter = new MultiTargetMetricReporter(targetModel)
+      val snapshot = PersistenceManager.loadAStarState(config.checkpointFile).get
+      val fullReport = reporter.generateFullReport(snapshot)
+
+      val targetLabels = targetModel.targetConstraints.zipWithIndex.map {
+        case (t, i) => s"${t.getClass.getSimpleName}_$i"
+      }
+
+      SimilarityCSVExporter.dumpToCSV(fullReport, targetLabels, "astar_metrics.csv")
+      info(s"Analysis complete. Structural matrix saved to astar_metrics.csv")
+
+      val overallBest = fullReport.flatMap(r => r.scores.map(s => (r.nodeString, s._1, s._2))).maxBy(_._3)
+      info(s"Highest logical match found: ${overallBest._1} aligns with ${overallBest._2} (${(overallBest._3 * 100).toInt}%)")
+      return
+    }
+
+
     val internalGrammar: ParsedGrammar = GrammarConverter.parseConstraintGrammar()
     debug(ParsedGrammar.toString)
 
@@ -52,6 +75,7 @@ object MainApp extends LogTrait {
       VisualDebugger.launch(config.checkpointFile)
       return;
     }
+
 
 
     info("\n--- Step 2: Invoking Mutation Engine ---")

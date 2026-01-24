@@ -75,14 +75,14 @@ private def toScala(value: Any): Any = value match {
 object ComponentRegistry extends LogTrait {
 
   private val binaryOperators: List[BinaryOperator[?]] = List(
-    /*
+
     // arithmetic
     new AddOperator[Integer],
     new SubOperator[Integer],
     new MulOperator[Integer],
-    //new DivOperator[Integer],
+    new DivOperator[Integer],
     new ModOperator[Integer],
-    */
+
 
     // relational
     new EqualOperator[Integer],
@@ -105,8 +105,8 @@ object ComponentRegistry extends LogTrait {
     new XorOperator[Boolean],
     new ImpliesOperator[Boolean],
 
-    // new ContainsOperator[List[Integer], Integer],
-    // new ContainsOperator[Set[Int], Int]
+     new ContainsOperator[List[Integer], Integer],
+     new ContainsOperator[Set[Int], Int]
   )
 
   private val unaryOperators: List[UnaryOperator[?]] = List(

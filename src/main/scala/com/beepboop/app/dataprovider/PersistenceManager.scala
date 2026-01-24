@@ -3,7 +3,7 @@ package com.beepboop.app.dataprovider
 import com.beepboop.app.astar.ModelNodeTMP
 import com.beepboop.app.components.Expression
 import com.beepboop.app.cpicker.ConstraintData
-import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.logger.{LogTrait, Profiler}
 
 import java.io.*
 import scala.annotation.targetName
@@ -89,8 +89,9 @@ object PersistenceManager extends LogTrait {
     try {
       scala.Console.err.println("\n!!! CAUGHT EXIT SIGNAL (Ctrl+C) !!!")
       scala.Console.err.println("Attempting emergency backup...")
-      saveCheckpoint(snapshot, checkpointPath, csvPath) // Reużywamy saveCheckpoint!
+      saveCheckpoint(snapshot, checkpointPath, csvPath)
       scala.Console.err.println("Emergency backup completed successfully.")
+      Profiler.report()
     } catch {
       case e: Exception => error(s"Emergency backup failed: ${e.getMessage}")
     }

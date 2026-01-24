@@ -35,7 +35,7 @@ object GenerateAllDiffn extends Mutation {
         Variable[List[Integer]](dx),
         Variable[List[Integer]](dy)
       )
-    }.toList
+    }.toList.distinct
   }
 }
 
