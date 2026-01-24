@@ -1,6 +1,7 @@
 package com.beepboop.app.mutations
 /* own modules */
 import com.beepboop.app.components.*
+import com.beepboop.app.dataprovider.ConfigLoader
 import com.beepboop.app.logger.LogTrait
 
 
@@ -76,16 +77,16 @@ object ExpressionGenerator extends LogTrait {
   }
 
   private def selectWeighted(candidates: List[Creatable]): Creatable = {
-    val registry = ComponentRegistry
-
     val candidatesWithWeights = candidates.map { c =>
+      val name = c.toString
+
       val weight = c match {
         case _: RandomVariableFactory => 50.0
-        case _ => registry.getWeight(c)
+        case _ => ConfigLoader.settings.expressionWeights.getOrElse(name, 0.0)
       }
       (c, weight)
     }
-
+    
     val totalWeight = candidatesWithWeights.map(_._2).sum
 
     if (totalWeight <= 0) return candidates(scala.util.Random.nextInt(candidates.length))

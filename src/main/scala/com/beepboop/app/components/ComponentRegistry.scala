@@ -8,7 +8,7 @@ import com.beepboop.app.components.Operator
 import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.components.StrEqExpression.StrEqFactory
-import com.beepboop.app.dataprovider.DataProvider
+import com.beepboop.app.dataprovider.{ConfigLoader, DataProvider}
 import com.beepboop.app.logger.LogTrait
 import org.yaml.snakeyaml.Yaml
 
@@ -146,36 +146,6 @@ object ComponentRegistry extends LogTrait {
     //LexicographicalExpression.asCreatable()
   )
 
-  private def toScala(value: Any): Any = value match {
-    case m: java.util.Map[_, _] =>
-      m.asScala.view.mapValues(toScala).toMap
-    case l: java.util.List[_] =>
-      l.asScala.map(toScala).toList
-    case other => other
-  }
-
-  private val configFile = "src/main/resources/expressions.yml"
-  private lazy val creatablesConfig: Map[String, Double] = {
-    val yaml = new Yaml()
-    val input = new FileInputStream(configFile)
-    try {
-      val javaData = yaml.load[java.util.Map[String, Object]](input)
-
-      def toDouble(obj: Object): Double = obj match {
-        case d: java.lang.Double => d.doubleValue()
-        case i: java.lang.Integer => i.doubleValue()
-        case b: java.lang.Boolean => if (b) 1.0 else 0.0
-        case _ => 0.0
-      }
-
-      javaData.asScala.toMap.map { case (k, v) =>
-        k -> toDouble(v)
-      }
-    } finally {
-      input.close()
-    }
-  }
-
 
   val creatables: List[Creatable] = (
     binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
@@ -185,14 +155,11 @@ object ComponentRegistry extends LogTrait {
       expressionFactories ++
       allArrayElementFactories
     ).filter(c =>
-    creatablesConfig.getOrElse(c.toString, 0.0) > 0.0
+    val className = c.toString
+    ConfigLoader.getWeight(className) > 0.0
   )
-
   debug(s"creatables: $creatables")
 
-  def getWeight(c: Creatable): Double = {
-    creatablesConfig.getOrElse(c.toString, 1.0)
-  }
 
 
   def findCreatablesReturning(outputType: ExpressionType): List[Creatable] = {
