@@ -1,6 +1,6 @@
 Constraint_ID,Snippet,Total_Variables,Unique_Variables,Total_Parameters
 1,bool_clause(Zs, []),1,1,0
-2,forall(j in Reactions) (Vs[j] >= 0),1,1,0
-3,forall(j in Reactions) ((Vs[j] > 0) <-> (Zs[j] == true)),2,2,0
-4,forall(i in Metabolites) (sum(j in Reactions)(Vs[j] * S[i,j]) = 0),1,1,1
-5,forall(i in Reversibles) (sum(j in Reactions)(Zs[j] * Revs[i,j]) <= 1),1,1,1
+2,forall(j in Reactions) (Vs[j] >= 0),3,2,0
+3,forall(j in Reactions) ((Vs[j] > 0) <-> (Zs[j] == true)),4,3,0
+4,forall(i in Metabolites) (sum(j in Reactions)(Vs[j] * S[i,j]) = 0),6,4,0
+5,forall(i in Reversibles) (sum(j in Reactions)(Zs[j] * Revs[i,j]) <= 1),6,4,0
