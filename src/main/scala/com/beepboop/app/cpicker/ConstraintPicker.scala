@@ -23,11 +23,8 @@ object ExpressionOrdering extends Ordering[Expression[?]] {
 }
 
 object ConstraintPicker extends LogTrait {
-  var config: AppConfig = null
+  var config: AppConfig = AppConfig.get
 
-  def setConfig(config: AppConfig): Unit = {
-    this.config = config
-  }
 
   private def order(item: ConstraintData): Double = item.distributionScore
 

@@ -1,8 +1,9 @@
 package com.beepboop.app.mutations
 
-import pureconfig._
-import pureconfig.module.yaml._
-import pureconfig.generic.derivation.default._
+import com.beepboop.app.utils.AppConfig
+import pureconfig.*
+import pureconfig.module.yaml.*
+import pureconfig.generic.derivation.default.*
 
 /* own modules */
 import com.beepboop.app.components.*
@@ -10,11 +11,7 @@ import com.beepboop.app.logger.LogTrait
 
 
 object AllMutations {
-  val allLoaded: List[Mutation] = YamlConfigSource.file("config.yaml")
-    .at("mutations")
-    .loadOrThrow[List[Mutation]]
-
-  val mutations = allLoaded.filter(_.enabled)
+  val mutations = AppConfig.enabledMutations
 
 
   val directory: Map[String, Mutation] = mutations.map(m => m.name -> m).toMap

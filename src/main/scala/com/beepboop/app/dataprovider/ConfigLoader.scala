@@ -23,18 +23,3 @@ case class AlgorithmConfig(
                       logging: LogConfig
                     ) derives ConfigReader
 
-
-object ConfigLoader {
-  import pureconfig.module.yaml._
-
-  val settings: AlgorithmConfig = YamlConfigSource.file("config.yaml")
-    .loadOrThrow[AlgorithmConfig]
-
-  def getWeight(componentName: String): Double = {
-    settings.expressionWeights.getOrElse(componentName, 0.0)
-  }
-
-  def getClassLogConfig(className: String): ClassLogConfig = {
-    settings.logging.classes.getOrElse(className.stripSuffix("$"), ClassLogConfig())
-  }
-}

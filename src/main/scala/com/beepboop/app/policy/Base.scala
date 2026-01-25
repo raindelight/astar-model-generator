@@ -51,7 +51,7 @@ case class EnsureAnyVarExists() extends GlobalPolicy {
 case class EnsureSpecificVarExists(targetName: String) extends GlobalPolicy {
   private var found = false
 
-  override def message: String = s"Expr doesn't contain '$targetName' in scope"
+  override def message: String = s"Expr doesn't contain required variable in scope"
 
   override def reset(): Unit = {
     found = false

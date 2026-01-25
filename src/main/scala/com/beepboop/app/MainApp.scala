@@ -28,10 +28,11 @@ import com.beepboop.app.logger.LogTrait
 object MainApp extends LogTrait {
 
   def main(args: Array[String]): Unit = {
-
     val configOpt = ArgumentParser.parse(args)
     if (configOpt.isEmpty) return
     val config = configOpt.get
+
+    AppConfig.init(config)
 
     info("--- Step 1: Configuration ---")
     info(s"Model: ${config.modelPath}")
@@ -125,9 +126,6 @@ object MainApp extends LogTrait {
 
     info("--- Step 4. Starting constraint picking ---")
 
-    ConstraintSaver.setConfig(config)
-
-    ConstraintPicker.setConfig(config)
     /* vvv comment if no gurobi license present vvv */
     //ConstraintPicker.runInitial(result.get)
 

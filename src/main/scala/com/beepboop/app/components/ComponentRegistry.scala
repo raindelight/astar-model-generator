@@ -8,8 +8,9 @@ import com.beepboop.app.components.Operator
 import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.components.StrEqExpression.StrEqFactory
-import com.beepboop.app.dataprovider.{ConfigLoader, DataProvider}
+import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.utils.AppConfig
 import org.yaml.snakeyaml.Yaml
 
 import scala.jdk.CollectionConverters.*
