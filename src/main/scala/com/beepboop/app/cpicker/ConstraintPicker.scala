@@ -5,11 +5,18 @@ import com.beepboop.app.components.Expression
 import com.beepboop.app.dataprovider.PersistenceManager
 import com.beepboop.app.logger.{LogTrait, Profiler}
 import com.beepboop.app.utils.AppConfig
+import com.beepboop.app.cpicker.DistributionScorer
 
 import scala.collection.parallel.CollectionConverters.*
 import scala.collection.mutable
 
-case class ConstraintData(constraint: List[Expression[?]], heuristics: Double, solCount: Long)
+case class ConstraintData(
+                           constraint: List[Expression[?]],
+                           heuristics: Double,
+                           solCount: Long,
+                           exprDepth: Int,
+                           distributionScore: Double
+                         )
 
 object ExpressionOrdering extends Ordering[Expression[?]] {
   def compare(x: Expression[?], y: Expression[?]): Int = x.toString.compareTo(y.toString)
@@ -22,7 +29,7 @@ object ConstraintPicker extends LogTrait {
     this.config = config
   }
 
-  private def order(item: ConstraintData) = -item.solCount
+  private def order(item: ConstraintData): Double = item.distributionScore
 
   var queue: mutable.PriorityQueue[ConstraintData] = mutable.PriorityQueue[ConstraintData]()(Ordering.by(order))
 
@@ -30,15 +37,23 @@ object ConstraintPicker extends LogTrait {
     val initialWorkload = nodes.par
     val validSingles = new mutable.ListBuffer[Expression[?]]()
     val round1Results = new mutable.ListBuffer[ConstraintData]()
-    info("Starting single evaluation using minizinc")
+
+    info("Starting single evaluation using minizinc with Normal Distribution Scoring")
+
     initialWorkload.foreach { tmpNode =>
       val expr = tmpNode.constraint
+
+      val size = expr.exprDepth
+      val distScore = DistributionScorer.scoreNormal(size)
+
       val tmpFile = ConstraintSaver.save(expr)
       val runner = new Runner(this.config)
       val solCount = runner.run(tmpFile)
+
       solCount match {
         case Some(value) if (value >= threshold) => {
-          val data = ConstraintData(List(expr), tmpNode.f, value)
+          val data = ConstraintData(List(expr), tmpNode.f, value, size, distScore)
+
           queue.synchronized {
             queue.enqueue(data)
           }
@@ -56,8 +71,9 @@ object ConstraintPicker extends LogTrait {
     info(s"ValidSingles: ${validSingles.size}")
 
     val baseExpressions = validSingles.toList
+
     var currentRoundGroups = round1Results
-      .sortBy(_.solCount)
+      .sortBy(d => -d.distributionScore)
       .take((round1Results.size * keepRatio).toInt.max(1))
       .map(_.constraint)
       .toList
@@ -75,12 +91,17 @@ object ConstraintPicker extends LogTrait {
         val batchWorkload = candidates.toList.par
 
         batchWorkload.foreach { group =>
+
+          val totalSize = group.map(_.exprDepth).sum
+          val distScore = DistributionScorer.scoreNormal(totalSize)
+
           val tmpFile = ConstraintSaver.save(group: _*)
           val runner = new Runner(this.config)
           val solCount = runner.run(tmpFile)
+
           solCount match {
             case Some(value) if (value >= threshold) => {
-              val data = ConstraintData(group, 0.0, value)
+              val data = ConstraintData(group, 0.0, value, totalSize, distScore)
               queue.synchronized {
                 queue.enqueue(data)
               }
@@ -94,7 +115,7 @@ object ConstraintPicker extends LogTrait {
         }
 
         currentRoundGroups = roundResults
-          .sortBy(_.solCount)
+          .sortBy(d => -d.distributionScore)
           .take((roundResults.size * Math.pow(keepRatio, round)).toInt.max(1))
           .map(_.constraint)
           .toList
@@ -102,6 +123,6 @@ object ConstraintPicker extends LogTrait {
       }
     }
 
-    PersistenceManager.saveConstraintsToCSV(queue.clone().dequeueAll, "queue.csv")
+    PersistenceManager.saveConstraintsToCSV(queue.clone().dequeueAll, this.config.pickedOutputCsv)
   }
 }
