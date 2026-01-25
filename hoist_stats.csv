@@ -1,0 +1,11 @@
+Constraint_ID,Snippet,Total_Variables,Unique_Variables,Total_Parameters
+1,forall(i in 0..N)( r[i] <= objective ),2,2,1
+2,symmetry_breaking_constraint(hoist[0]=1),1,1,0
+3,sum(B) <=J,1,1,1
+4,forall(i in 1..N)(r[i]+objective*B[i] >= r[i-1]+f(i-1)+tmin(i)),4,3,1
+5,forall(i in 1..N)(r[i]+objective*B[i] <= r[i-1]+f(i-1)+tmax(i)),4,3,1
+6,objective >= r[N]+f(N),2,2,2
+7,r[0] = 0,1,1,0
+8,"forall(i in 1..N,j in 0..i-1)(hoist[i] > hoist[j] \/ r[i]+f(i)+e(i+1,j)<=r[j] \/ r[j]+f(j)+e(j+1,i)<=r[i",4,2,12
+9,"forall(i in 1..N, j in 0..i-1 )(hoist[i] > hoist[j] \/ ( r[i]+f(i)+e(i+1,j) <= r[j]+objective /\ r[j]+f(",6,3,12
+10,forall(i in 1..N)(r[i] <= r[i-1]+f(i-1)+p_ub*(Capacity-B[i])),4,3,3
