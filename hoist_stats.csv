@@ -1,11 +1,11 @@
 Constraint_ID,Snippet,Total_Variables,Unique_Variables,Total_Parameters
-1,forall(i in 0..N)( r[i] <= objective ),4,2,1
-2,symmetry_breaking_constraint(hoist[0]=1),1,1,0
-3,sum(B) <=J,2,2,0
-4,forall(i in 1..N)(r[i]+objective*B[i] >= r[i-1]+f(i-1)+tmin(i)),5,3,0
-5,forall(i in 1..N)(r[i]+objective*B[i] <= r[i-1]+f(i-1)+tmax(i)),5,3,0
-6,objective >= r[N]+f(N),3,3,0
-7,r[0] = 0,1,1,0
-8,forall(i in 1..N,j in 0..i-1)(hoist[i] > hoist[j] \/ r[i]+f(i)+e(i+1,j)<=r[j] \/ r[j]+f(j)+e(j+1,i)<=r[i]),5,2,0
-9,forall(i in 1..N, j in 0..i-1 )(hoist[i] > hoist[j] \/ ( r[i]+f(i)+e(i+1,j) <= r[j]+objective /\ r[j]+f(j)+e(j+1,i) <= r[i]+objective ) ),6,3,0
-10,forall(i in 1..N)(r[i] <= r[i-1]+f(i-1)+p_ub*(Capacity-B[i])),5,4,0
+1,forall(i in 0..N)( r[i] <= objective ),5,3,2,2
+2,symmetry_breaking_constraint(hoist[0]=1),1,0,1,0
+3,sum(B) <=J,2,0,2,0
+4,forall(i in 1..N)(r[i]+objective*B[i] >= r[i-1]+f(i-1)+tmin(i)),11,7,5,2
+5,forall(i in 1..N)(r[i]+objective*B[i] <= r[i-1]+f(i-1)+tmax(i)),11,7,5,2
+6,objective >= r[N]+f(N),5,2,3,1
+7,r[0] = 1,0,1,0
+8,forall(i in 1..N,j in 0..i-1)(hoist[i] > hoist[j] \/ r[i]+f(i)+e(i+1,j)<=r[j] \/ r[j]+f(j)+e(j+1,i)<=r[i]),22,16,5,3
+9,forall(i in 1..N, j in 0..i-1 )(hoist[i] > hoist[j] \/ ( r[i]+f(i)+e(i+1,j) <= r[j]+objective /\ r[j]+f(j)+e(j+1,i) <= r[i]+objective ) ),24,16,6,3
+10,forall(i in 1..N)(r[i] <= r[i-1]+f(i-1)+p_ub*(Capacity-B[i])),11,6,6,2
