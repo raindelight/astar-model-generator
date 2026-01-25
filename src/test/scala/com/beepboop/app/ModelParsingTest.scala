@@ -1,8 +1,12 @@
 import com.beepboop.app.ParserUtil
+import com.beepboop.app.components.{IntType, ListIntType, ListSetIntType}
+import com.beepboop.app.dataprovider.{DataProvider, ModelParser}
+import com.beepboop.app.utils.{AppConfig, ArgumentParser}
 import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Inspectors.*
 import org.antlr.v4.runtime.*
+import org.scalatest.BeforeAndAfterAll
 
 import scala.io.Source
 
@@ -21,7 +25,56 @@ private object ThrowingErrorListener extends BaseErrorListener {
   }
 }
 
+class VariableExtractionSuite extends AnyFunSuite with BeforeAndAfterAll {
 
+  override def beforeAll(): Unit = {
+    val testArgs = Array(".", "--config", "config.yaml")
+
+    val configObject = ArgumentParser.parse(testArgs).get
+
+    AppConfig.init(configObject)
+  }
+
+  test("ModelParser should extract variables and parameters with correct InternalTypes") {
+    val filename = "src/test/resources/models/accap_test.mzn"
+    val (parameters, variables) = ModelParser.getDataItems(filename)
+    val allItems = parameters ++ variables
+
+    val expectedTypes = Map(
+      "flights" -> IntType,
+      "FLIGHT" -> ListIntType,
+      "times" -> IntType,
+      "TIME" -> ListIntType,
+      "COUNTER" -> ListIntType,
+      "AIRLINE" -> ListIntType,
+      "airlines" -> IntType,
+      "FA" -> ListSetIntType,
+      //"ISet" -> ListSetIntType,
+      "cNum" -> ListIntType,
+      "xCoor" -> ListIntType,
+      "yCoor" -> ListIntType,
+      "opDur" -> ListIntType,
+      "S" -> ListIntType,
+      "D" -> IntType
+    )
+
+    expectedTypes.foreach { case (name, expectedType) =>
+      val itemOpt = allItems.find(_.name == name)
+
+      assert(itemOpt.isDefined, s"Expected item '$name' was not found in the model")
+
+      val item = itemOpt.get
+      if (item.name == "times") {
+        println(s"Detailed Data for 'times': isArray=${item.detailedDataType.isArray}, isSet=${item.detailedDataType.isSet}")
+      }
+      val actualType = DataProvider.getExpressionType(item)
+
+      assert(actualType == expectedType,
+        s"Type mismatch for '$name' Expected: $expectedType, but got: $actualType (Raw: ${item.dataType})")
+    }
+  }
+
+  }
 class OverallGrammarParserSuite extends AnyFunSuite {
   val modelsToTest: List[String] = List.apply(
     "australia_test.mzn",
