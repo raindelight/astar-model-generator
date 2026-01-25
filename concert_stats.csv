@@ -1,0 +1,6 @@
+Constraint_ID,Snippet,Total_Variables,Unique_Variables,Total_Parameters
+1,forall (clique in cliques where clique_is_maximal(clique)) (alldifferent_except_0([assign[o] | o in clique]) :: bounds),8,2,5,2
+2,forall (o in Offer) (assign[o] in {0} union feasible_halls(o)),5,3,3,1
+3,if break_dominance then forall (p, q in Offer where dominates(p, q)) (symmetry_breaking_constraint(assign[q] > 0 -> assign[p] > 0)) else true endif,10,6,5,2
+4,if break_symmetry then forall (h in Hall) (symmetry_breaking_constraint(value_precede_chain(eqclass(h), assign))) else true endif,5,2,4,1
+5,objective = sum (o in Offer) (price[o] * (assign[o] > 0)),7,3,5,1
