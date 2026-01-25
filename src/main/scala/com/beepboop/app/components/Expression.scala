@@ -51,8 +51,8 @@ abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends L
   def distance(context: Map[String, Any]): Int = {
     0
   }
-  def symbolCount: Int = this match {
-    case c: ComposableExpression => 1 + c.children.map(_.symbolCount).sum
+  def exprDepth: Int = this match {
+    case c: ComposableExpression => 1 + c.children.map(_.exprDepth).sum
     case _ => 1
   }
 }
