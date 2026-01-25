@@ -1,7 +1,7 @@
 package com.beepboop.app.mutations
 /* own modules */
 import com.beepboop.app.components.*
-import com.beepboop.app.dataprovider.ConfigLoader
+import com.beepboop.app.utils.AppConfig
 import com.beepboop.app.logger.LogTrait
 
 
@@ -82,7 +82,7 @@ object ExpressionGenerator extends LogTrait {
 
       val weight = c match {
         case _: RandomVariableFactory => 50.0
-        case _ => ConfigLoader.settings.expressionWeights.getOrElse(name, 0.0)
+        case _ => AppConfig.getWeight(name)
       }
       (c, weight)
     }

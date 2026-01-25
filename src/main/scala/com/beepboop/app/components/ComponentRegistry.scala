@@ -157,7 +157,7 @@ object ComponentRegistry extends LogTrait {
       allArrayElementFactories
     ).filter(c =>
     val className = c.toString
-    ConfigLoader.getWeight(className) > 0.0
+    AppConfig.getWeight(className) > 0.0
   )
   debug(s"creatables: $creatables")
 
