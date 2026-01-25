@@ -1,5 +1,5 @@
 Constraint_ID,Snippet,Total_Variables,Unique_Variables,Total_Parameters
 1,diffn(xCoor, yCoor, opDur, cNum),4,4,0
-2,forall(f in FLIGHT)( (yCoor[f] + cNum[f] - 1) <= D ),3,3,1
+2,forall(f in FLIGHT)( (yCoor[f] + cNum[f] - 1) <= D ),4,3,1
 3,forall(a in AIRLINE, f, g in FA[a] where f != g)( ((yCoor[f] + cNum[f] - 1) - (yCoor[g]) <= S[a]) ),6,6,0
 4,objective = sum(a in AIRLINE)(S[a]) + D,3,3,1
