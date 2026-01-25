@@ -14,7 +14,7 @@ case class ConstraintData(
                            constraint: List[Expression[?]],
                            heuristics: Double,
                            solCount: Long,
-                           symbolCount: Int,
+                           exprDepth: Int,
                            distributionScore: Double
                          )
 
@@ -43,7 +43,7 @@ object ConstraintPicker extends LogTrait {
     initialWorkload.foreach { tmpNode =>
       val expr = tmpNode.constraint
 
-      val size = expr.symbolCount
+      val size = expr.exprDepth
       val distScore = DistributionScorer.scoreNormal(size)
 
       val tmpFile = ConstraintSaver.save(expr)
@@ -92,7 +92,7 @@ object ConstraintPicker extends LogTrait {
 
         batchWorkload.foreach { group =>
 
-          val totalSize = group.map(_.symbolCount).sum
+          val totalSize = group.map(_.exprDepth).sum
           val distScore = DistributionScorer.scoreNormal(totalSize)
 
           val tmpFile = ConstraintSaver.save(group: _*)
