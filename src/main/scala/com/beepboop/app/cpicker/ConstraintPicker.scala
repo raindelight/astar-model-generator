@@ -40,7 +40,7 @@ object ConstraintPicker extends LogTrait {
     initialWorkload.foreach { tmpNode =>
       val expr = tmpNode.constraint
 
-      val size = expr.exprDepth
+      val size = expr.complexity
       val distScore = DistributionScorer.scoreNormal(size)
 
       val tmpFile = ConstraintSaver.save(expr)
@@ -89,7 +89,7 @@ object ConstraintPicker extends LogTrait {
 
         batchWorkload.foreach { group =>
 
-          val totalSize = group.map(_.exprDepth).sum
+          val totalSize = group.map(_.complexity).sum
           val distScore = DistributionScorer.scoreNormal(totalSize)
 
           val tmpFile = ConstraintSaver.save(group: _*)

@@ -67,7 +67,13 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
           case _ => UnknownType
         }
 
-        val innerCtx = ctx.withVariable(f.iteratorDef.variableName, innerType)
+        val domainExpr = f.iteratorDef.collection
+
+        val innerCtx = ctx.withVariable(
+          f.iteratorDef.variableName,
+          innerType,
+          domainExpr
+        )
 
         collectPossibleMutations(f.iteratorDef.collection, ctx) ++
           collectPossibleMutations(f.body, innerCtx)
@@ -84,6 +90,7 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
 
   def replaceNodeInTree(root: Expression[?], target: Expression[?], replacement: Expression[?]): Expression[?] = {
     if (root eq target) {
+      replacement.creatorInfo += s" | Mutated by replacement logic"
       return replacement
     }
 
@@ -100,4 +107,6 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
       case other => other
     }
   }
+  
+  
 }

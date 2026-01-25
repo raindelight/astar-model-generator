@@ -1,6 +1,9 @@
 package com.beepboop.app.mutations
 
+import com.beepboop.app.components.{ArrayElement, ComposableExpression, IntType}
 import pureconfig.ConfigReader
+
+import scala.reflect.ClassTag
 
 /* own modules */
 import com.beepboop.app.components
@@ -8,7 +11,6 @@ import com.beepboop.app.components.{BoolType, ComponentRegistry, Constant, Diffn
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
 
-// Options to keep original names and use 'type' as the discriminator
 
 sealed trait Mutation extends LogTrait derives ConfigReader {
   def enabled: Boolean

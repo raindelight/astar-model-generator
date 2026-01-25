@@ -6,20 +6,22 @@ import com.beepboop.app.logger.LogTrait
 
 
 case class GenerationContext(
-                              variables: Map[ExpressionType, List[String]] = Map.empty
+                              variables: Map[ExpressionType, List[String]] = Map.empty,
                             ) {
-  def withVariable(name: String, varType: ExpressionType): GenerationContext = {
+  def withVariable(name: String, varType: ExpressionType, domain: Expression[?]): GenerationContext = {
     val existingNames = variables.getOrElse(varType, List.empty)
-    copy(variables = variables + (varType -> (name :: existingNames)))
+    copy(
+      variables = variables + (varType -> (name :: existingNames)),
+    )
   }
 }
-
 object ExpressionGenerator extends LogTrait {
 
   def generate(
                 requiredType: ExpressionType,
                 maxDepth: Int,
-                ctx: GenerationContext = GenerationContext()
+                ctx: GenerationContext = GenerationContext(),
+                exclude: Option[Class[_]] = None
               ): Option[Expression[?]] = {
 
     val registry = ComponentRegistry
@@ -53,55 +55,84 @@ object ExpressionGenerator extends LogTrait {
 
       return None
     }
-    val chosenCreatable = selectWeighted(possibleCreatables)
+
+    val filteredPool = exclude match {
+      case Some(cls) =>
+        val excludeName = cls.getSimpleName.stripSuffix("$")
+        possibleCreatables.filterNot(_.toString == excludeName)
+      case None =>
+        possibleCreatables
+    }
+    //println(exclude.toString)
+    //println(filteredPool.mkString(","))
+
+
+    //val finalPool = if (filteredPool.nonEmpty) filteredPool else possibleCreatables
+
+
+    val chosenCreatable = selectWeighted(possibleCreatables, ctx)
 
 
     debug(s"Selected: ${chosenCreatable.getClass.getName}")
 
 
 
-    chosenCreatable match {
+    val result = chosenCreatable match {
       case scoped: ContextAwareCreatable =>
         scoped.generateExpression(ctx, (t, c) => generate(t, maxDepth - 1, c))
 
       case standard =>
         val inputs = standard.templateSignature.inputs
-        val children = inputs.map(inputType => generate(inputType, maxDepth - 1, ctx)) // Pass same ctx
-
+        val children = inputs.map(inputType => generate(inputType, maxDepth - 1, ctx))
         if (children.forall(_.isDefined)) {
-          Some(standard.create(children.flatten))
+          val flattenedChildren = children.flatten
+          val actualChildTypes = flattenedChildren.map(_.signature.output)
+          if (actualChildTypes == inputs) {
+            Some(standard.create(flattenedChildren))
+          } else {
+            debug(s"Type mismatch during standard creation: Expected $inputs but got $actualChildTypes")
+            None
+          }
         } else {
           None
         }
     }
+    result.foreach { expr =>
+      expr.creatorInfo = s"Created by [${chosenCreatable.toString}] at Depth [$maxDepth] for Type [$requiredType] - ${result.get.toString}. "
+    }
+    result
   }
 
-  private def selectWeighted(candidates: List[Creatable]): Creatable = {
+  private def selectWeighted(candidates: List[Creatable], ctx: GenerationContext): Creatable = {
     val candidatesWithWeights = candidates.map { c =>
       val name = c.toString
-
       val weight = c match {
-        case _: RandomVariableFactory => 50.0
-        case _ => AppConfig.getWeight(name)
+        case factory: RandomVariableFactory =>
+          val localNames = ctx.variables.getOrElse(factory.varType, Nil)
+
+          if (factory.availableNames.exists(localNames.contains)) {
+            800.0
+          } else {
+            50.0
+          }
+        case _ =>
+          AppConfig.getWeight(name)
       }
       (c, weight)
     }
-    
     val totalWeight = candidatesWithWeights.map(_._2).sum
 
-    if (totalWeight <= 0) return candidates(scala.util.Random.nextInt(candidates.length))
+    if (totalWeight <= 0) {
+      candidates(scala.util.Random.nextInt(candidates.length))
+    } else {
+      val randomValue = scala.util.Random.nextDouble() * totalWeight
 
-    val randomValue = scala.util.Random.nextDouble() * totalWeight
+      val result = candidatesWithWeights.scanLeft((0.0, None: Option[Creatable])) {
+        case ((acc, _), (creatable, weight)) => (acc + weight, Some(creatable))
+      }.find { case (cumulative, _) => cumulative > randomValue }
 
-    var cumulativeWeight = 0.0
-    for ((creatable, weight) <- candidatesWithWeights) {
-      cumulativeWeight += weight
-      if (randomValue < cumulativeWeight) {
-        return creatable
-      }
+      result.flatMap(_._2).getOrElse(candidates.last)
     }
-
-    candidates.last
   }
 
   private def sequence[T](opts: List[Option[T]]): Option[List[T]] =

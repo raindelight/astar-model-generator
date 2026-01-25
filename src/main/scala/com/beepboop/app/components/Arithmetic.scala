@@ -84,11 +84,20 @@ object Orable {
 
 trait Xorable[T] extends Serializable{
   def xor(a: T, b: T): T
+  def distance(leftDist: Integer, rightDist: Integer, a: T, b: T): Integer
 }
 
 object Xorable {
   implicit object BoolIsXorable extends Xorable[Boolean] {
     override def xor(a: Boolean, b: Boolean): Boolean = a ^ b
+
+    override def distance(leftDist: Integer, rightDist: Integer, leftEval: Boolean, rightEval: Boolean): Integer = {
+      if (leftEval ^ rightEval) {
+        Math.min(leftDist, rightDist)
+      } else {
+        Math.max(1, Math.min(leftDist, rightDist))
+      }
+    }
   }
 }
 
