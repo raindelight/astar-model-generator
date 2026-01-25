@@ -1,18 +1,23 @@
 package com.beepboop.app.mutations
 
+import pureconfig.ConfigReader
+
 /* own modules */
 import com.beepboop.app.components
 import com.beepboop.app.components.{BoolType, ComponentRegistry, Constant, DiffnExpression, Expression, ListIntType, OperatorContainer, RandomVariableFactory, Variable}
 import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
 
-trait Mutation extends LogTrait {
+// Options to keep original names and use 'type' as the discriminator
+
+sealed trait Mutation extends LogTrait derives ConfigReader {
+  def enabled: Boolean
   def name: String
   def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]]
 }
 
 
-object GenerateAllDiffn extends Mutation {
+case class GenerateAllDiffn(enabled: Boolean = true) extends Mutation {
   override def name: String = "GenerateAllDiffn"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {
@@ -40,7 +45,7 @@ object GenerateAllDiffn extends Mutation {
 }
 
 
-object ReplaceOperator extends Mutation {
+case class ReplaceOperator(enabled: Boolean = true) extends Mutation {
   override def name: String = "ReplaceOperator"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {
@@ -62,7 +67,7 @@ object ReplaceOperator extends Mutation {
 }
 
 
-object TransformVariableToConstant extends Mutation {
+case class TransformVariableToConstant(enabled: Boolean = true) extends Mutation {
   override def name: String = "TransformVariableToConstant"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {
@@ -80,7 +85,7 @@ object TransformVariableToConstant extends Mutation {
 }
 
 
-object TransformConstantToVariable extends Mutation {
+case class TransformConstantToVariable(enabled: Boolean = true) extends Mutation {
   override def name: String = "TransformConstantToVariable"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {
@@ -100,7 +105,7 @@ object TransformConstantToVariable extends Mutation {
   }
 }
 
-object ChangeVariable extends Mutation {
+case class ChangeVariable(enabled: Boolean = true) extends Mutation {
   override def name: String = "ChangeVariable"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {
@@ -127,7 +132,7 @@ object ChangeVariable extends Mutation {
   }
 }
 
-class ReplaceSubtree(val maxDepth: Int) extends Mutation {
+case class ReplaceSubtree(val maxDepth: Int, enabled: Boolean = true) extends Mutation {
   override def name: String = "ReplaceSubtree"
 
   override def apply(expression: Expression[?], ctx: GenerationContext): List[Expression[?]] = {

@@ -14,6 +14,10 @@ libraryDependencies += "org.yaml" % "snakeyaml" % "2.2"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 libraryDependencies += "com.lihaoyi" %% "mainargs" % "0.7.6"
 libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.13.8"
+libraryDependencies ++= Seq(
+  "com.github.pureconfig" %% "pureconfig-core"      % "0.17.9",
+  "com.github.pureconfig" %% "pureconfig-yaml"      % "0.17.9"
+)
 
 javacOptions ++= Seq("-source", "21", "-target", "21")
 
