@@ -1,40 +1,36 @@
 package com.beepboop.app.dataprovider
 
-
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 import scala.language.postfixOps
 import spray.json.*
-import DefaultJsonProtocol.*
 import com.beepboop.app.MinizincDznVisitor
 import com.beepboop.app.logger.LogTrait
-import com.beepboop.parser.NewMinizincParserBaseListener
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser}
 
 import scala.collection.JavaConverters.asScalaBufferConverter
-import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
 
 object DataImporter extends DefaultJsonProtocol, LogTrait {
 
-
   def prepareSets(data: String, dataItems: List[DataItem]): Unit = {
-    dataItems.filter(_.detailedDataType.isSet).foreach { item =>
+    dataItems.filter(i => i.detailedDataType != null && i.detailedDataType.isSet && (i.value == null || i.value == None)).foreach { item =>
       val expr = item.expr
 
-      if (expr != "") {
+      if (expr != null && expr.trim.nonEmpty) {
         try {
-          val parts = parseRange(expr)
+          if (expr.contains("..")) {
+            val parts = parseRange(expr)
 
-          val minVal = resolveBound(parts(0), dataItems)
-          val maxVal = resolveBound(parts(1), dataItems)
+            val minVal = resolveBound(parts(0), dataItems)
+            val maxVal = resolveBound(parts(1), dataItems)
 
-          val setValues = (minVal to maxVal).toList
-          item.value = setValues
+            val setValues = (minVal to maxVal).toList
+            item.value = setValues
 
-          info(s"Set ${item.name} resolved: $minVal..$maxVal (size: ${setValues.size})")
+            info(s"Set ${item.name} resolved: $minVal..$maxVal (size: ${setValues.size})")
+          }
         } catch {
           case e: Exception =>
             warn(s"Failed to resolve set '${item.name}' with expr '$expr': ${e.getMessage}")
@@ -50,18 +46,40 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
       return raw.toInt
     }
 
-    val sumPattern = "sum\\((.*)\\)".r
+    val SumPattern = """sum\s*\(\s*(.*)\s*\)""".r
+    val MinPattern = """min\s*\(\s*(.*)\s*\)""".r
+    val MaxPattern = """max\s*\(\s*(.*)\s*\)""".r
+
     raw match {
-      case sumPattern(varName) =>
-        val listValue = lookupDependency(varName, dataItems)
-        listValue match {
-          case l: List[_] => l.map(_.toString.toInt).sum
-          case _ => throw new IllegalArgumentException(s"Item '$varName' is not a list, cannot calculate sum.")
-        }
+      case SumPattern(varName) =>
+        getAsIntList(varName, dataItems).sum
+
+      case MinPattern(varName) =>
+        val list = getAsIntList(varName, dataItems)
+        if (list.nonEmpty) list.min else 0
+
+      case MaxPattern(varName) =>
+        val list = getAsIntList(varName, dataItems)
+        if (list.nonEmpty) list.max else 0
 
       case varName =>
-        val value = lookupDependency(varName, dataItems)
-        value.toString.toInt
+        lookupDependency(varName, dataItems) match {
+          case i: Int => i
+          case s: String => Try(s.toInt).getOrElse(throw new IllegalArgumentException(s"Value '$s' for '$varName' is not an integer."))
+          case other => throw new IllegalArgumentException(s"Dependency '$varName' is not a scalar integer (found ${other.getClass.getSimpleName}).")
+        }
+    }
+  }
+
+  private def getAsIntList(name: String, dataItems: List[DataItem]): List[Int] = {
+    lookupDependency(name, dataItems) match {
+      case l: List[_] => l.map {
+        case i: Int => i
+        case s: String => Try(s.toInt).getOrElse(0)
+        case d: Double => d.toInt
+        case other => throw new IllegalArgumentException(s"List element in '$name' is not numeric: $other")
+      }
+      case other => throw new IllegalArgumentException(s"Dependency '$name' is not a list (found ${other.getClass.getSimpleName}).")
     }
   }
 

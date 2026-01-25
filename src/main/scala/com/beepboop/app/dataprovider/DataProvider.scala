@@ -150,7 +150,7 @@ object DataProvider extends LogTrait {
       DataImporter.importDataFile(dPath, instanceParams)
 
       val paramMap: Map[String, Any] = instanceParams
-        .filter(_.value != null)
+        .filter(p => p.value != null && p.value != None)
         .map(p => p.name -> p.value)
         .toMap
 
