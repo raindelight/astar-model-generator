@@ -4,11 +4,10 @@ import yaml
 import random
 from pathlib import Path
 
-# --- KONFIGURACJA ŚCIEŻEK ---
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results_ablation_random")
 GENERATED_CONFIGS_DIR = os.path.join(PROJECT_ROOT, "generated_configs_ablation")
-TEMPLATE_FILE = os.path.join(PROJECT_ROOT, "config_template.yaml")
+TEMPLATE_FILE = os.path.join(PROJECT_ROOT, "config_accap.yaml")
 
 USER_HOME = str(Path.home())
 GUROBI_LICENSE = os.path.join(USER_HOME, "development", "gurobi.lic")
@@ -20,12 +19,20 @@ SAMPLES_PER_LEVEL = 2
 PROBLEMS = {
     "Accap": {
         "model": "models/mznc2024_probs/accap/accap.mzn",
-        "data": "models/accap_a10_f80_t50.json",
+        "data": [
+            "models/mznc2024_probs/accap/accap_a3_f20_t10.json",
+            "models/mznc2024_probs/accap/accap_a8_f50_t30.json",
+            "models/mznc2024_probs/accap/accap_a10_f80_t50.json",
+            "models/mznc2024_probs/accap/accap_a20_f160_t90.json",
+            "models/mznc2024_probs/accap/accap_a30_f300_t120.json"
+        ],
         "sols": "models/accap_sols_a10.csv"
     },
     "Community": {
         "model": "models/mznc2024_probs/community-detection/community-detection.mzn",
-        "data": "models/mznc2024_probs/community-detection/Zakhary.s12.k3.dzn",
+        "data": [
+            "models/mznc2024_probs/community-detection/Zakhary.s12.k3.dzn"
+        ],
         "sols": "models/community.s12.k3.csv"
     }
 }
@@ -75,23 +82,19 @@ def run_experiment():
     total_mutations = len(all_mutation_types)
 
     print(f"=== START LOSOWEGO WYŁĄCZANIA MUTACJI ===")
-    print(f"Znaleziono {total_mutations} mutacji w szablonie.")
 
     for prob_name, paths in PROBLEMS.items():
         print(f"\n>>> Problem: {prob_name}")
 
         for iter_count in ITERATIONS:
-
             max_drop = total_mutations - 1
 
             for drop_k in range(max_drop + 1):
-
                 current_samples = 1 if drop_k == 0 else SAMPLES_PER_LEVEL
 
                 for sample_i in range(current_samples):
 
                     disabled_types = random.sample(all_mutation_types, drop_k)
-
                     allowed_types = [t for t in all_mutation_types if t not in disabled_types]
 
                     config_path, active_count = generate_subset_config(drop_k, sample_i, allowed_types)
@@ -102,11 +105,17 @@ def run_experiment():
                     picked_csv = os.path.join(RESULTS_DIR, f"{run_id}_picked.csv")
                     checkpoint = os.path.join(RESULTS_DIR, f"{run_id}.bin")
 
-                    print(f"   [Drop {drop_k}/{total_mutations}] Sample {sample_i+1}: Active={active_count}. Config: {os.path.basename(config_path)}")
+                    print(f"   [Drop {drop_k}/{total_mutations}] Sample {sample_i+1}: Active={active_count}")
+
+                    data_files = paths["data"]
+                    if isinstance(data_files, str):
+                        data_files = [data_files]
+
+                    data_args_str = " ".join([f'-d "{path}"' for path in data_files])
 
                     sbt_args = (
                         f'run {paths["model"]} '
-                        f'-D {paths["data"]} '
+                        f'{data_args_str} '
                         f'-s {paths["sols"]} '
                         f'-i {iter_count} '
                         f'-e {HEURISTIC} '
