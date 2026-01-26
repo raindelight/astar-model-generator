@@ -1,10 +1,20 @@
 package com.beepboop.app
 
-import com.beepboop.app.components._
-import com.beepboop.app.utils.Implicits._
+import com.beepboop.app.components.*
+import com.beepboop.app.utils.{AppConfig, ArgumentParser}
+import com.beepboop.app.utils.Implicits.*
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.AnyFunSuite
 
-class ConstraintsHeuristicSuiteTest extends AnyFunSuite {
+class ConstraintsHeuristicSuiteTest extends AnyFunSuite with BeforeAndAfterAll {
+  override def beforeAll(): Unit = {
+    val testArgs = Array(".", "--config", "config.yaml")
+
+    val configObject = ArgumentParser.parse(testArgs).get
+
+    AppConfig.init(configObject)
+  }
+
 
   private def i(n: Int): Integer = Integer.valueOf(n)
   private def c(value: Int): Constant[Integer] = Constant(i(value))

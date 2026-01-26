@@ -24,11 +24,8 @@ object ExpressionOrdering extends Ordering[Expression[?]] {
 }
 
 object ConstraintPicker extends LogTrait {
-  var config: AppConfig = null
+  var config: AppConfig = AppConfig.get
 
-  def setConfig(config: AppConfig): Unit = {
-    this.config = config
-  }
 
   private def order(item: ConstraintData): Double = {
     item.solCount.toDouble * item.distributionScore
@@ -49,7 +46,7 @@ object ConstraintPicker extends LogTrait {
     initialWorkload.foreach { tmpNode =>
       val expr = tmpNode.constraint
 
-      val depth = expr.exprDepth
+      val depth = expr.depth
       val symbols = expr.symbolCount
       val distScore = DistributionScorer.scoreNormal(symbols, distMean, distStd)
 
@@ -99,7 +96,7 @@ object ConstraintPicker extends LogTrait {
 
         batchWorkload.foreach { group =>
 
-          val totalDepth = group.map(_.exprDepth).sum
+          val totalDepth = group.map(_.depth).sum
           val totalSymbols = group.map(_.symbolCount).sum
 
           val avgDistScore = group.map(expr =>

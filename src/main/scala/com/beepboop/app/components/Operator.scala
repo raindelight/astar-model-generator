@@ -73,9 +73,9 @@ case class MulOperator[T: ClassTag]()(implicit strategy: Multiplicable[T]) exten
   }
 }
 
-case class DivOperator[T: ClassTag]()(implicit strategy: Divisible[T]) extends BinaryOperator[T] {
+case class DivOperator[T: ClassTag]()(implicit strategy: Divisible[T]) extends BinaryOperator[T], LogTrait {
   override def eval(left: Any, right: Any): T = {
-    strategy.div(left.asInstanceOf[T], right.asInstanceOf[T])
+      strategy.div(left.asInstanceOf[T], right.asInstanceOf[T])
   }
 
   override def toString: String = "/"
@@ -118,22 +118,7 @@ case class EqualOperator[T: ClassTag]()(implicit strategy: Equatable[T]) extends
   }
 
   override def distance(left: Any, right: Any): Int = {
-    val leftT = left.asInstanceOf[T]
-    val rightT = right.asInstanceOf[T]
-
-    if (classOf[Number].isAssignableFrom(classTag[T].runtimeClass)) {
-      Math.abs(leftT.asInstanceOf[Number].intValue() - rightT.asInstanceOf[Number].intValue())
-    } else if (classOf[Set[?]].isAssignableFrom(classTag[T].runtimeClass)) {
-      try {
-        val s1 = leftT.asInstanceOf[Set[Any]]
-        val s2 = rightT.asInstanceOf[Set[Any]]
-        (s1 diff s2).size + (s2 diff s1).size
-      } catch {
-        case _: Exception => if (strategy.equal(leftT, rightT)) 0 else 1
-      }
-    } else {
-      if (strategy.equal(leftT, rightT)) 0 else 1
-    }
+    strategy.distance(left.asInstanceOf[T], right.asInstanceOf[T])
   }
 }
 
@@ -181,12 +166,7 @@ case class LessOperator[T: ClassTag]()(implicit strategy: LessThan[T]) extends B
   override def distance(left: Any, right: Any): Int = {
     val leftT = left.asInstanceOf[T]
     val rightT = right.asInstanceOf[T]
-
-    if (leftT.isInstanceOf[Integer] && rightT.isInstanceOf[Integer]) {
-      Math.abs(leftT.asInstanceOf[Integer] - (rightT.asInstanceOf[Integer] - 1))
-    } else {
-      if (strategy.less(leftT, rightT)) 0 else 1
-    }
+    strategy.distance(leftT, rightT)
   }
 }
 
@@ -201,11 +181,7 @@ case class LessEqualOperator[T: ClassTag]()(implicit strategy: LessEqual[T]) ext
   override def distance(left: Any, right: Any): Int = {
     val leftT = left.asInstanceOf[T]
     val rightT = right.asInstanceOf[T]
-    if (leftT.isInstanceOf[Integer] && rightT.isInstanceOf[Integer]) {
-      Math.abs(leftT.asInstanceOf[Integer] - rightT.asInstanceOf[Integer])
-    } else {
-      if (strategy.lessEqual(leftT, rightT)) 0 else 1
-    }
+    strategy.distance(leftT, rightT)
   }
 }
 
@@ -226,11 +202,7 @@ case class GreaterOperator[T: ClassTag]()(implicit strategy: GreaterThan[T]) ext
   override def distance(left: Any, right: Any): Int = {
     val leftT = left.asInstanceOf[T]
     val rightT = right.asInstanceOf[T]
-    if (leftT.isInstanceOf[Integer] && rightT.isInstanceOf[Integer]) {
-      Math.abs(leftT.asInstanceOf[Integer] - (rightT.asInstanceOf[Integer] + 1))
-    } else {
-      if (strategy.greater(leftT, rightT)) 0 else 1
-    }
+    strategy.distance(leftT, rightT)
   }
 
 }
@@ -251,11 +223,7 @@ case class GreaterEqualOperator[T: ClassTag]()(implicit strategy: GreaterEqual[T
   override def distance(left: Any, right: Any): Int = {
     val leftT = left.asInstanceOf[T]
     val rightT = right.asInstanceOf[T]
-    if (leftT.isInstanceOf[Integer] && rightT.isInstanceOf[Integer]) {
-      Math.abs(leftT.asInstanceOf[Integer] - rightT.asInstanceOf[Integer])
-    } else {
-      if (strategy.greaterEqual(leftT, rightT)) 0 else 1
-    }
+    strategy.distance(leftT,rightT)
   }
 }
 

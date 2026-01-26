@@ -1,13 +1,21 @@
 import com.beepboop.app.components.{SubOperator, *}
 import com.beepboop.app.postprocessor.Postprocessor
+import com.beepboop.app.utils.{AppConfig, ArgumentParser}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Inspectors.*
-import org.scalatest.Tag
+import org.scalatest.{BeforeAndAfterAll, Tag}
 
 
 
 
-class PostprocessorSuite extends AnyFunSuite {
+class PostprocessorSuite extends AnyFunSuite with BeforeAndAfterAll {
+  override def beforeAll(): Unit = {
+    val testArgs = Array(".", "--config", "config.yaml")
+
+    val configObject = ArgumentParser.parse(testArgs).get
+
+    AppConfig.init(configObject)
+  }
 
 
   test("Unary expression should be simplified on constant abs(-2) | JoinConstants") {

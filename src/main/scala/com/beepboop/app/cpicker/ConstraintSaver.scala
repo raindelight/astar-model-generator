@@ -9,11 +9,8 @@ import java.io.File
 
 
 object ConstraintSaver {
-  var config: AppConfig = null
+  var config: AppConfig = AppConfig.get
 
-  def setConfig(config: AppConfig): Unit = {
-    this.config = config
-  }
   def save(constraints: Expression[?]*): Path = {
     val tempPath: Path = Files.createTempFile("mzn_temp_", ".mzn")
     tempPath.toFile.deleteOnExit();

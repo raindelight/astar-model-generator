@@ -1,6 +1,11 @@
 package com.beepboop.app.utils
 
-import mainargs.{arg, ParserForClass, Flag}
+import pureconfig.module.yaml.YamlConfigSource
+import pureconfig.ConfigSource
+import com.beepboop.app.dataprovider.{AlgorithmConfig, ClassLogConfig}
+import com.beepboop.app.mutations.Mutation
+import mainargs.{Flag, ParserForClass, arg}
+import pureconfig.ConfigSource
 
 case class GeneratorConfig(
                             @arg(positional = true, doc = "Path to the .mzn model file")
@@ -46,7 +51,10 @@ case class GeneratorConfig(
                             analyzeModel: String = "nothing",
 
                             @arg(name = "gurobi-license", doc = "Path to gurobi license file")
-                            gurobiLicense: String = ""
+                            gurobiLicense: String = "",
+
+                            @arg(name = "config", doc = "Path to config file")
+                            config: String = "config.yaml"
                           )
 
 case class AppConfig(
@@ -64,8 +72,41 @@ case class AppConfig(
                       debug: Boolean,
                       gurobiLicense: String,
                       analyze: Boolean,
-                      analyzeModel: String
+                      analyzeModel: String,
+                      config: String,
                     )
+
+
+object AppConfig {
+
+  private var _instance: Option[AppConfig] = None
+
+  def init(config: AppConfig): Unit = {
+    _instance = Some(config)
+  }
+
+  def get: AppConfig = _instance.getOrElse(
+    throw new IllegalStateException("AppConfig not initialized! Call AppConfig.init() in Main.")
+  )
+
+  lazy val algorithm: AlgorithmConfig = {
+    val yamlPath = get.config
+    YamlConfigSource.file(yamlPath).loadOrThrow[AlgorithmConfig]
+  }
+
+  lazy val enabledMutations: List[Mutation] = {
+    algorithm.mutations.filter(_.enabled)
+  }
+
+  def getWeight(componentName: String): Double = {
+    algorithm.expressionWeights.getOrElse(componentName, 0.0)
+  }
+
+  def getClassLogConfig(className: String): ClassLogConfig = {
+    val cleanName = className.stripSuffix("$")
+    algorithm.logging.classes.getOrElse(cleanName, ClassLogConfig())
+  }
+}
 
 object ArgumentParser {
 
@@ -122,7 +163,8 @@ object ArgumentParser {
           debug = cli.debug.value,
           gurobiLicense = cli.gurobiLicense,
           analyze = cli.analyze.value,
-          analyzeModel = cli.analyzeModel
+          analyzeModel = cli.analyzeModel,
+          config = cli.config
         ))
 
       case Left(errorMsg) =>

@@ -2,11 +2,11 @@ package com.beepboop.app.logger
 
 // third party
 import com.beepboop.app.dataprovider.ClassLogConfig
+import com.beepboop.app.utils.AppConfig
 import org.slf4j.LoggerFactory
 import com.typesafe.scalalogging.Logger
 // own
 import com.beepboop.app.logger.*
-import com.beepboop.app.dataprovider.ConfigLoader
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -15,11 +15,12 @@ trait LogTrait {
   @transient
   protected lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  private lazy val globalLogEnable: Boolean = ConfigLoader.settings.logging.enabled
-  private lazy val logConfigDebug: Boolean = ConfigLoader.settings.logging.logDebug
+  private lazy val globalLogEnable: Boolean = AppConfig.algorithm.logging.enabled
+  private lazy val logConfigDebug: Boolean = AppConfig.algorithm.logging.logDebug
+
 
   private lazy val logConfig: ClassLogConfig = {
-    val tLogConfig = ConfigLoader.getClassLogConfig(getClass.getName)
+    val tLogConfig = AppConfig.getClassLogConfig(getClass.getName)
     if (logConfigDebug) {
       logger.debug(s"Config for: ${getClass.getName} | level: ${tLogConfig.level} | gEnable: $globalLogEnable | enabled: ${tLogConfig.enabled}")
     }
