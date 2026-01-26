@@ -30,28 +30,28 @@ MUTATION_SETS = {
 
     # 3. Zmiany tylko na poziomie liści (zmienne i stałe)
     "Leaf_Tweaks": [
-        "ChangeVariable",
-        "TransformVariableToConstant",
-        "TransformConstantToVariable"
+        "change-variable",
+        "transform-variable-to-constant",
+        "transform-constant-to-variable"
     ],
 
     # 4. Zmiany strukturalne
     "Structural_Changes": [
-        "ReplaceOperator",
-        "ReplaceSubtree"
+        "replace-operator",
+        "replace-subtree"
     ],
 
     # 5. Bez niszczenia poddrzew (Bez ReplaceSubtree)
     "No_Random_Subtree": [
-        "ChangeVariable",
-        "TransformVariableToConstant",
-        "TransformConstantToVariable",
-        "ReplaceOperator",
-        "GenerateAllDiffn"
+        "change-variable",
+        "transform-variable-to-constant",
+        "transform-constant-to-variable",
+        "replace-operator",
+        "generate-all-diffn"
     ],
 
     # 6. Specyficzne dla problemów geometrycznych/pakowania (jeśli dotyczy)
-    #"Diffn_Focus": ["GenerateAllDiffn"]
+    "Diffn_Focus": ["generate-all-diffn"]
 }
 
 PROBLEMS = {

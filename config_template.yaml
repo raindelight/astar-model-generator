@@ -27,6 +27,8 @@ mutations:
     enabled: true
     max-depth: 4
 
+  - type: generate
+
 expression-weights:
   Variable: 1.0
   Constant: 1.0
