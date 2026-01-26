@@ -1,7 +1,7 @@
 package com.beepboop.app
 
 import com.beepboop.parser.NewMinizincParserBaseListener
-import com.beepboop.parser.NewMinizincParser.Var_decl_itemContext
+import com.beepboop.parser.NewMinizincParser.{Enum_itemContext, Var_decl_itemContext}
 import org.antlr.v4.runtime.misc.Interval
 import org.antlr.v4.runtime.{CommonTokenStream, ParserRuleContext}
 import com.beepboop.app.dataprovider.*
@@ -39,6 +39,45 @@ class MinizincModelListener(tokens: CommonTokenStream, extendedDataType: Boolean
     }
 
     None
+  }
+
+  override def enterEnum_item(ctx: Enum_itemContext): Unit = {
+    val name = ctx.ident().getText
+
+    var expr = ""
+    var fullType = "set of int"
+
+    val rawText = textWithSpaces(ctx)
+    if (rawText.contains("=")) {
+      val parts = rawText.split("=", 2)
+      if (parts.length > 1) {
+        val rhs = parts(1).trim.stripSuffix(";")
+
+        if (rhs.startsWith("_(") && rhs.endsWith(")")) {
+          expr = rhs.substring(2, rhs.length - 1).trim
+        } else {
+          expr = rhs
+        }
+      }
+    }
+
+    val detailedType = DataType(
+      dataType = "int",
+      isArray = false,
+      isIdentifier = false,
+      isSet = true
+    )
+
+    val dataItem = DataItem(
+      name = name,
+      dataType = fullType,
+      isVar = false,
+      value = None,
+      detailedDataType = detailedType,
+      expr = expr
+    )
+
+    dataItemsBuffer += dataItem
   }
 
   override def enterVar_decl_item(ctx: Var_decl_itemContext): Unit = {

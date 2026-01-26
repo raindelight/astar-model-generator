@@ -16,9 +16,12 @@ HEURISTICS = ["avg", "min", "max", "mse", "var"]
 PROBLEMS = {
     "Accap": {
         "model": "models/mznc2024_probs/accap/accap.mzn",
-        "data": "models/accap_a10_f80_t50.json",
-        "sols": "models/accap_sols_a10.csv"
-    },
+        "data": ["models/accap_a10_f80_t50.json", "models/accap_a3_f20_t10.json", "models/accap_a8_f50_t30.json", "models/accap_a20_f160_t90.json"],
+        "sols": ["models/accap_sols_a10.csv", "models/accap.a3.csv", "models/accap.a8.csv", "models/accap.a20.csv"],
+        "config_path": "config_accap.yaml"
+    }
+}
+'''
     "Network": {
         "model": "models/mznc2024_probs/network_50_cstr/efm_cstr.mzn",
         "data": "models/mznc2024_probs/network_50_cstr/MODEL1507180015.dzn",
@@ -41,6 +44,7 @@ PROBLEMS = {
     }
 }
 
+'''
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -70,17 +74,17 @@ def run_experiment():
 
                 print(f"\n[{current_experiment}/{total_experiments}] Problem: {prob_name} | Iter: {iter_count} | Heur: {heuristic}")
 
-                sbt_args = (
-                    f'run {paths["model"]} '
-                    f'-D {paths["data"]} '
-                    f'-s {paths["sols"]} '
-                    f'-i {iter_count} '
-                    f'-e {heuristic} '
-                    f'-o "{output_csv_path}" '
-                    f'-p "{picked_csv_path}" '
-                    f'-c "{checkpoint_path}" '
+                sbt_args = \
+                    f'run {paths["model"]} ' + \
+                    " ".join([f'-D {x} ' for x in paths["data"]]) + \
+                    " ".join([f'-s {x} ' for x in paths["sols"]]) + \
+                    f'-i {iter_count} ' + \
+                    f'-e {heuristic} ' + \
+                    f'-o "{output_csv_path}" ' + \
+                    f'-p "{picked_csv_path}" ' + \
+                    f'-c "{checkpoint_path}" ' + \
+                    f'-C "{paths["config_path"]}" ' + \
                     f'--gurobi-license "{GUROBI_LICENSE}"'
-                )
 
                 full_command = f'sbt "{sbt_args}"'
 

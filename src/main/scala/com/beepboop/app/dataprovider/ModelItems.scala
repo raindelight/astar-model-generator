@@ -9,6 +9,7 @@ case class DataType(
                    isArray: Boolean,
                    isIdentifier: Boolean, // todo: isSet?
                    isSet: Boolean = false,
+                   dimensions: List[String] = List()
                    )
 
 case class DataItem(

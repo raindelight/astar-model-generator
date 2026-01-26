@@ -73,7 +73,7 @@ object ExpressionGenerator extends LogTrait {
     val chosenCreatable = selectWeighted(possibleCreatables, ctx)
 
 
-    debug(s"Selected: ${chosenCreatable.getClass.getName}")
+    debug(s"Selected: ${chosenCreatable.getClass.getName} -> Returns: ${chosenCreatable.templateSignature.output}")
 
 
 

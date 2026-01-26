@@ -1,10 +1,10 @@
 package com.beepboop.app.dataprovider
-
 import com.beepboop.app.dataprovider.{DataItem, DataType}
 import com.beepboop.app.logger.LogTrait
 
 import scala.io.Source
-import scala.util.{Failure, Success, Try}
+import scala.util.Using
+import scala.collection.mutable.ListBuffer
 
 object SolutionParser extends LogTrait {
 
@@ -19,6 +19,7 @@ object SolutionParser extends LogTrait {
         .map(v => v.name -> v.detailedDataType)
         .toMap
 
+
       lines match {
         case headerLine :: dataLines if dataLines.nonEmpty =>
           val headers = headerLine.split(separator).map(_.trim)
@@ -29,7 +30,6 @@ object SolutionParser extends LogTrait {
             if (headers.length == values.length) {
               val typedMap = headers.zip(values).map { case (header, valueStr) =>
                 val dataTypeOption = schema.get(header).flatMap(Option(_))
-
                 val parsedValue = dataTypeOption match {
                   case Some(dataType) => parseValue(valueStr, dataType)
                   case None           => valueStr
@@ -61,7 +61,7 @@ object SolutionParser extends LogTrait {
 
     try {
       if (dataType.isArray) {
-        parseArray(valueStr, dataType.dataType)
+        parseComplexArray(valueStr, dataType.dataType)
       } else {
         parseScalar(valueStr, dataType.dataType)
       }
@@ -72,35 +72,91 @@ object SolutionParser extends LogTrait {
     }
   }
 
-  private def parseArray(arrayStr: String, typeName: String): List[Any] = {
+  private def parseComplexArray(arrayStr: String, typeName: String): List[Any] = {
     val cleanStr = arrayStr.trim.stripPrefix("[").stripSuffix("]")
-    if (cleanStr.isEmpty) {
-      List.empty
-    } else {
-      cleanStr.split(',')
-        .map(_.trim)
-        .map(elem => parseScalar(elem, typeName))
-        .toList
+    if (cleanStr.isEmpty) return List.empty
+
+    val elements = splitIgnoringBraces(cleanStr, ',')
+
+    elements.map { rawElem =>
+      val elem = rawElem.trim
+      if (elem.startsWith("{")) {
+        parseSet(elem)
+      } else if (elem.contains("..")) {
+        parseRangeToSet(elem)
+      } else {
+        parseScalar(elem, typeName)
+      }
     }
+
+
+  }
+
+  private def parseSet(setStr: String): List[Int] = {
+    val inner = setStr.stripPrefix("{").stripSuffix("}").trim
+    if (inner.isEmpty) List.empty[Int]
+    else {
+      inner.split(',').map(_.trim).flatMap { part =>
+        if (part.contains("..")) parseRangeToSet(part)
+        else scala.util.Try(part.toInt).toOption
+      }.toList
+    }
+  }
+
+  private def parseRangeToSet(rangeStr: String): List[Int] = {
+    val parts = rangeStr.split("\\.\\.")
+    if (parts.length == 2) {
+      val start = parts(0).toInt
+      val end = parts(1).toInt
+      (start to end).toList
+    } else {
+      List.empty
+    }
+  }
+
+  private def splitIgnoringBraces(str: String, separator: Char): List[String] = {
+    val result = ListBuffer[String]()
+    var current = new StringBuilder
+    var braceDepth = 0
+
+    for (c <- str) {
+      c match {
+        case '{' =>
+          braceDepth += 1
+          current += c
+        case '}' =>
+          braceDepth -= 1
+          current += c
+        case `separator` if braceDepth == 0 =>
+          result += current.toString()
+          current = new StringBuilder
+        case _ =>
+          current += c
+      }
+    }
+    if (current.nonEmpty) result += current.toString()
+    result.toList
   }
 
   private def parseScalar(value: String, typeName: String): Any = {
     val lowerType = Option(typeName).getOrElse("string").toLowerCase
+    val cleanValue = value.trim
 
     if (lowerType.contains("bool")) {
-      value.toLowerCase match {
+      cleanValue.toLowerCase match {
         case "true" | "1" | "yes" => true
         case "false" | "0" | "no" => false
-        case _ => value.toBooleanOption.getOrElse(value == "1")
+        case _ => cleanValue.toBooleanOption.getOrElse(cleanValue == "1")
       }
     }
     else if (lowerType.contains("float") || lowerType.contains("decimal")) {
-      value.toDouble
+      cleanValue.toDouble
     }
     else if (lowerType.contains("int") || lowerType.matches(".*\\d+\\.\\.\\d+.*") || lowerType.contains("var")) {
-      value.toInt
+      scala.util.Try(cleanValue.toInt).getOrElse(cleanValue)
     }
     else {
-      scala.util.Try(value.toInt).getOrElse(value)
+      cleanValue
     }
-  }}
+  }
+}

@@ -10,6 +10,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import com.beepboop.parser.{NewMinizincLexer, NewMinizincParser}
 
 import scala.collection.JavaConverters.asScalaBufferConverter
+import scala.util.matching.Regex
 
 
 object DataImporter extends DefaultJsonProtocol, LogTrait {
@@ -173,9 +174,48 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
       }
     }
   }
+
+
+  def extractAndRemove2DMatrices(raw: String, dataItems: List[DataItem]): String = {
+    val pattern = new Regex("(?s)([a-zA-Z0-9_]+)\\s*=\\s*\\[\\|(.*?)\\|\\]\\s*;")
+
+    var processedData = raw
+
+    pattern.findAllMatchIn(raw).foreach { m =>
+      val name = m.group(1)
+      val content = m.group(2)
+
+      dataItems.find(_.name == name).foreach { item =>
+        try {
+          val rows = content.split("\\|").map(_.trim).filter(_.nonEmpty)
+
+          if (rows.nonEmpty) {
+            val matrix = rows.map { rowStr =>
+              rowStr.split(",")
+                .map(_.trim)
+                .filter(_.nonEmpty)
+                .map(_.toInt)
+                .toList
+            }.toList
+
+            info(s"Manually parsed 2D Matrix '$name' with dimensions ${matrix.length}x${matrix.headOption.map(_.length).getOrElse(0)}")
+            item.value = matrix
+          }
+        } catch {
+          case e: Exception =>
+            error(s"Failed to manual parse matrix $name: ${e.getMessage}")
+        }
+      }
+    }
+
+    pattern.replaceAllIn(raw, "")
+  }
+
   def parseDzn(data: String, dataItems: List[DataItem]): Unit = {
     try {
-      val charStream = CharStreams.fromString(data)
+      val cleanData = extractAndRemove2DMatrices(data, dataItems)
+
+      val charStream = CharStreams.fromString(cleanData)
       val lexer = new NewMinizincLexer(charStream)
       val tokens = new CommonTokenStream(lexer)
       val parser = new NewMinizincParser(tokens)
@@ -191,12 +231,17 @@ object DataImporter extends DefaultJsonProtocol, LogTrait {
       }
 
       dataItems.filter(_.value != None).foreach { item =>
-        info(s"Parsed DZN value for ${item.name}: ${item.value}")
+        val valStr = item.value match {
+          case l: List[_] if l.size > 10 => s"List (size=${l.size})"
+          case other => other.toString
+        }
+        info(s"Parsed DZN value for ${item.name}: $valStr")
       }
 
     } catch {
       case e: Exception =>
         error(s"Error parsing DZN file: ${e.getMessage}")
+        e.printStackTrace()
     }
   }
 

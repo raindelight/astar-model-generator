@@ -55,8 +55,8 @@ object MainApp extends LogTrait {
         case (t, i) => s"${t.getClass.getSimpleName}_$i"
       }
 
-      SimilarityCSVExporter.dumpToCSV(fullReport, targetLabels, "astar_metrics.csv")
-      info(s"Analysis complete. Structural matrix saved to astar_metrics.csv")
+      SimilarityCSVExporter.dumpToCSV(fullReport, targetLabels, config.outputCsv + ".analyze.csv")
+      info(s"Analysis complete. Structural matrix saved to ${config.outputCsv}.analyze.csv")
 
       val overallBest = fullReport.flatMap(r => r.scores.map(s => (r.nodeString, s._1, s._2))).maxBy(_._3)
       info(s"Highest logical match found: ${overallBest._1} aligns with ${overallBest._2} (${(overallBest._3 * 100).toInt}%)")
@@ -104,14 +104,14 @@ object MainApp extends LogTrait {
       }
     }))
 
-    val initialExpr = ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2)
-     .getOrElse(Constant(value = false))
-    
+    val initialExpr = Iterator.continually {
+      ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2)
+    }.find(_.isDefined).flatten
 
     info("--- Step 3: Starting Optimization Loop ---")
 
     val result = searcher.findOptimalModel(
-      initialConstraint = initialExpr,
+      initialConstraint = initialExpr.get,
       availableVars = DataProvider.variables,
       dataPars = DataProvider.parameters,
       maxIterations = config.maxIterations,
