@@ -51,7 +51,7 @@ case class EnsureAnyVarExists() extends GlobalPolicy {
 case class EnsureSpecificVarExists(targetName: String) extends GlobalPolicy {
   private var found = false
 
-  override def message: String = s"Expr doesn't contain '$targetName' in scope"
+  override def message: String = s"Expr doesn't contain required variable in scope"
 
   override def reset(): Unit = {
     found = false
@@ -107,5 +107,27 @@ case class NoDuplicateVar() extends LocalPolicy {
       }
 
     case _ => Compliant
+  }
+}
+
+case class MaxDepth(limit: Int) extends GlobalPolicy {
+  override def message: String = s"Expression exceeds max depth of $limit"
+
+  override def reset(): Unit = {}
+
+  override def visit(node: Expression[?]): Unit = {}
+
+
+  override def isSatisfied: Boolean = true
+}
+
+object DepthChecker {
+  def exceeds(expr: Expression[?], limit: Int, current: Int = 0): Boolean = {
+    if (current > limit) return true
+    expr match {
+      case c: com.beepboop.app.components.ComposableExpression =>
+        c.children.exists(child => exceeds(child, limit, current + 1))
+      case _ => false
+    }
   }
 }

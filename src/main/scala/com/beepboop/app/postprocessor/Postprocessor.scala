@@ -423,6 +423,7 @@ object Postprocessor {
   }
 
   def simplify[T : ClassTag](expr: Expression[T]): Expression[T] = {
+    val originalOutput = expr.signature.output
     val nodeWithSimplifiedChildren: Expression[T] = expr match {
       case c: ComposableExpression =>
         val newChildren = c.children.map {
@@ -435,5 +436,15 @@ object Postprocessor {
         leaf
     }
     Postprocessor.applyAllRules(nodeWithSimplifiedChildren)
+
+    val finalNode = Postprocessor.applyAllRules(nodeWithSimplifiedChildren)
+
+    finalNode.creatorInfo = s"Simplified from: ${expr.getClass.getSimpleName} (Original Creator: ${expr.creatorInfo})"
+
+    if (finalNode.signature.output != originalOutput) {
+      return nodeWithSimplifiedChildren
+    }
+
+    finalNode
   }
 }

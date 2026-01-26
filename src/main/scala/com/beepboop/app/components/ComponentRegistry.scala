@@ -8,8 +8,9 @@ import com.beepboop.app.components.Operator
 import com.beepboop.app.components.Expression
 import com.beepboop.app.components.SetIntContainsInt
 import com.beepboop.app.components.StrEqExpression.StrEqFactory
-import com.beepboop.app.dataprovider.{ConfigLoader, DataProvider}
+import com.beepboop.app.dataprovider.DataProvider
 import com.beepboop.app.logger.LogTrait
+import com.beepboop.app.utils.AppConfig
 import org.yaml.snakeyaml.Yaml
 
 import scala.jdk.CollectionConverters.*
@@ -20,6 +21,7 @@ sealed trait ExpressionType
 case object IntType extends ExpressionType
 case object BoolType extends ExpressionType
 case object ListIntType extends ExpressionType
+case object ListBoolType extends ExpressionType
 case object SetIntType extends ExpressionType
 case object IteratorType extends ExpressionType
 case object UnknownType extends ExpressionType
@@ -44,6 +46,8 @@ def scalaTypeToExprType(cls: Class[?]): ExpressionType = cls match {
     BoolType
   case c if c == classOf[List[Integer]] =>
     ListIntType
+  case c if c == classOf[List[Boolean]] =>
+    ListBoolType
 
   case c if c == classOf[Set[Int]] || classOf[Set[?]].isAssignableFrom(c) =>
     SetIntType
@@ -80,8 +84,8 @@ object ComponentRegistry extends LogTrait {
     new AddOperator[Integer],
     new SubOperator[Integer],
     new MulOperator[Integer],
-    new DivOperator[Integer],
-    new ModOperator[Integer],
+    //new DivOperator[Integer],
+    //new ModOperator[Integer],
 
 
     // relational
@@ -105,8 +109,8 @@ object ComponentRegistry extends LogTrait {
     new XorOperator[Boolean],
     new ImpliesOperator[Boolean],
 
-     new ContainsOperator[List[Integer], Integer],
-     new ContainsOperator[Set[Int], Int]
+    new ContainsOperator[List[Integer], Integer],
+    new ContainsOperator[Set[Int], Int]
   )
 
   private val unaryOperators: List[UnaryOperator[?]] = List(
@@ -123,11 +127,11 @@ object ComponentRegistry extends LogTrait {
 
   private val allConstantFactories: List[Creatable] = List(
     Constant.asCreatable[Integer](() => scala.util.Random.nextInt(10)),
-    Constant.asCreatable[Boolean](() => scala.util.Random.nextBoolean())
+    //Constant.asCreatable[Boolean](() => scala.util.Random.nextBoolean())
   )
   private val allArrayElementFactories: List[Creatable] = List(
     ArrayElement.asCreatable[Integer](),
-    ArrayElement.asCreatable[Boolean](),
+    ArrayElement.asCreatable[List[Integer]]()
   )
 
   private val expressionFactories: List[Creatable] = List(
@@ -142,23 +146,39 @@ object ComponentRegistry extends LogTrait {
     DiffnExpression.DiffnFactory,
     ValuePrecedesChainExpression.ValuePrecedesChainFactory,
     StrEqExpression.StrEqFactory,
+    AllDifferentExceptZeroExpression.Factory,
+    ArgSortExpression.Factory,
+    SymmetryBreakingExpression.Factory,
+    SetComprehensionExpression.IntSetComprehensionFactory
     //CumulativeExpression
     //LexicographicalExpression.asCreatable()
   )
 
 
-  val creatables: List[Creatable] = (
-    binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
+  val staticCreatables: List[Creatable] = (
+      binaryOperators.map(op => BinaryExpression.asCreatable(op)) ++
       unaryOperators.map(op => UnaryExpression.asCreatable(op)) ++
       allConstantFactories ++
-      allVariablesFactories ++
       expressionFactories ++
       allArrayElementFactories
     ).filter(c =>
     val className = c.toString
-    ConfigLoader.getWeight(className) > 0.0
+    AppConfig.getWeight(className) > 0.0
   )
-  debug(s"creatables: $creatables")
+
+  def creatables: List[Creatable] = {
+    val currentVariables = DataProvider.getVariableCreatables
+      .filter(v => v.templateSignature.output != UnknownType)
+    val all = staticCreatables ++ currentVariables
+    all
+  }
+
+  creatables.foreach { c =>
+    val sig = c.templateSignature
+    val inputs = sig.inputs.map(_.toString).mkString(", ")
+    debug(s"COMPONENT: ${c.toString} | OUTPUT: ${sig.output} | INPUTS: ($inputs)")
+  }
+
 
 
 

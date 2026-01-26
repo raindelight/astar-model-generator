@@ -1,10 +1,20 @@
 package com.beepboop.app
 
-import com.beepboop.app.components._
+import com.beepboop.app.components.*
+import com.beepboop.app.utils.{AppConfig, ArgumentParser}
 import org.scalatest.funsuite.AnyFunSuite
 import com.beepboop.app.utils.Implicits.*
+import org.scalatest.BeforeAndAfterAll
 
-class ForAllExpressionSuite extends AnyFunSuite {
+class ForAllExpressionSuite extends AnyFunSuite with BeforeAndAfterAll {
+
+  override def beforeAll(): Unit = {
+    val testArgs = Array(".", "--config", "config.yaml")
+
+    val configObject = ArgumentParser.parse(testArgs).get
+
+    AppConfig.init(configObject)
+  }
 
   test("ForAllExpression should evaluate to true when all elements satisfy the predicate") {
     // forall(i in [1, 2, 3]))(i > 0)

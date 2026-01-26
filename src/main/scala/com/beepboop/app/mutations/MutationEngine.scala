@@ -1,8 +1,9 @@
 package com.beepboop.app.mutations
 
-import pureconfig._
-import pureconfig.module.yaml._
-import pureconfig.generic.derivation.default._
+import com.beepboop.app.utils.AppConfig
+import pureconfig.*
+import pureconfig.module.yaml.*
+import pureconfig.generic.derivation.default.*
 
 /* own modules */
 import com.beepboop.app.components.*
@@ -10,11 +11,7 @@ import com.beepboop.app.logger.LogTrait
 
 
 object AllMutations {
-  val allLoaded: List[Mutation] = YamlConfigSource.file("config.yaml")
-    .at("mutations")
-    .loadOrThrow[List[Mutation]]
-
-  val mutations = allLoaded.filter(_.enabled)
+  val mutations = AppConfig.enabledMutations
 
 
   val directory: Map[String, Mutation] = mutations.map(m => m.name -> m).toMap
@@ -70,7 +67,13 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
           case _ => UnknownType
         }
 
-        val innerCtx = ctx.withVariable(f.iteratorDef.variableName, innerType)
+        val domainExpr = f.iteratorDef.collection
+
+        val innerCtx = ctx.withVariable(
+          f.iteratorDef.variableName,
+          innerType,
+          domainExpr
+        )
 
         collectPossibleMutations(f.iteratorDef.collection, ctx) ++
           collectPossibleMutations(f.body, innerCtx)
@@ -87,6 +90,7 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
 
   def replaceNodeInTree(root: Expression[?], target: Expression[?], replacement: Expression[?]): Expression[?] = {
     if (root eq target) {
+      replacement.creatorInfo += s" | Mutated by replacement logic"
       return replacement
     }
 
@@ -103,4 +107,6 @@ class MutationEngine(val activeMutations: List[Mutation]) extends LogTrait {
       case other => other
     }
   }
+  
+  
 }

@@ -1,7 +1,7 @@
 package com.beepboop.app.astar
 
 import com.beepboop.app.*
-import com.beepboop.app.components.{BinaryExpression, Expression}
+import com.beepboop.app.components.{BinaryExpression, BoolType, Expression}
 import com.beepboop.app.dataprovider.{DataItem, DataProvider}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.logger.Profiler
@@ -12,7 +12,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
-import com.beepboop.app.policy.{Compliant, DenyDivByZero, EnsureAnyVarExists, NonCompliant, Scanner}
+import com.beepboop.app.policy.{Compliant, DenyDivByZero, EnsureAnyVarExists, MaxDepth, NonCompliant, Scanner}
 import com.beepboop.app.postprocessor.Postprocessor
 
 import scala.collection.mutable
@@ -37,6 +37,10 @@ case class ModelNodeTMP(
                          h: Int,
                        ) extends Serializable {
   val f: Int = g + h
+
+  override def toString: String = {
+    s"[f=$f, g=$g, h=$h] ${constraint.toString}"
+  }
 
   override def equals(obj: Any): Boolean = obj match {
     case that: ModelNodeTMP => this.constraint == that.constraint
@@ -111,7 +115,8 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
                         checkpointFile: String,
                         outputCsvFile: String
                       ): Option[mutable.Set[ModelNodeTMP]] = {
-
+    require(initialConstraint.signature.output == BoolType,
+      s"Initial constraint must return BoolType, but got ${initialConstraint.signature.output}")
     val gScore = mutable.Map[Expression[?], Int]()
 
     if (!isInitialized) {
@@ -406,7 +411,7 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
           }
 
           debug(s"Generated: $candidateTree to simplified $simplifiedTree")
-          val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero())
+          val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero(), MaxDepth(5))
 
           if (result.isAllowed) {
             Profiler.recordValue("accepted", 1)

@@ -150,7 +150,7 @@ object DataProvider extends LogTrait {
       DataImporter.importDataFile(dPath, instanceParams)
 
       val paramMap: Map[String, Any] = instanceParams
-        .filter(_.value != null)
+        .filter(p => p.value != null && p.value != None)
         .map(p => p.name -> p.value)
         .toMap
 
@@ -174,6 +174,26 @@ object DataProvider extends LogTrait {
 
     info(s"Total: Loaded $solutionCount contexts across ${dataPaths.size} instances.")
 
+    info("==================== DATA LOADING SUMMARY ====================")
+    val previewCtx = if (solutionContexts.nonEmpty) solutionContexts.head else Map.empty
+
+    (variables ++ parameters).sortBy(_.name).foreach { item =>
+      val internalKind = if (item.isVar) "VAR" else "PAR"
+      val internalType = getExpressionType(item)
+
+      val valuePreview = previewCtx.get(item.name) match {
+        case Some(l: List[_]) =>
+          if (l.nonEmpty && l.head.isInstanceOf[Set[_]]) s"List[Set] (size=${l.size}, first=${l.head})"
+          else s"List (size=${l.size})"
+        case Some(s: Set[_]) => s"Set (size=${s.size})"
+        case Some(v) => v.toString
+        case None => "MISSING / NONE"
+      }
+
+      info(f"[$internalKind] ${item.name}%-20s | Type: ${internalType.toString}%-15s | Val: $valuePreview")
+    }
+    info("==============================================================\n")
+
     initializeCreatables(solutionContexts.head, modelParamsSchema)
   }
 
@@ -194,10 +214,25 @@ object DataProvider extends LogTrait {
   }
 
   def getExpressionType(item: DataItem): ExpressionType = {
-    val typeStr = Option(item.detailedDataType).map(_.toString.toLowerCase).getOrElse("")
-    if (typeStr.contains("set") && typeStr.contains("array")) ListSetIntType
-    else if (typeStr.contains("array")) ListIntType
-    else IntType
+    val typeStr = Option(item.detailedDataType)
+      .map(_.dataType.toLowerCase)
+      .getOrElse(item.dataType.toLowerCase)
+
+    val isArray = Option(item.detailedDataType).exists(_.isArray)
+    val isSet = Option(item.detailedDataType).exists(_.isSet)
+
+    if (isArray && isSet) ListSetIntType
+    else if (isArray) ListIntType
+    else if (isSet) ListIntType
+    else if (typeStr.contains("bool")) BoolType
+    else if (typeStr.contains("int") || typeStr.contains("..")) IntType
+    else {
+      solutionContexts.headOption.flatMap(_.get(item.name)) match {
+        case Some(_: Int) | Some(_: java.lang.Integer) => IntType
+        case Some(_: Boolean) | Some(_: java.lang.Boolean) => BoolType
+        case _ => UnknownType
+      }
+    }
   }
 
   private def inferTypeFromValue(value: Any): ExpressionType = value match {
