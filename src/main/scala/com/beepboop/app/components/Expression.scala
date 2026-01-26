@@ -57,7 +57,8 @@ abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends L
   }
   def symbolCount: Int = this match {
     case c: ComposableExpression => c.children.map(_.symbolCount).sum
-    case _ => 1
+    case _: Variable[?] => 1
+    case _ => 0
   }
 }
 
