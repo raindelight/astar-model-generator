@@ -38,6 +38,9 @@ case class GeneratorConfig(
                             @arg(short = 'r', doc = "Resume from checkpoint if exists")
                             resume: Flag,
 
+                            @arg(name = "config", short = 'C', doc = "Path to the configuration YAML file")
+                            configPath: String = "config.yaml",
+
                             @arg(name = "debug", short = 'd', doc = "Launch Visual Debugger GUI instead of running search")
                             debug: Flag,
 
@@ -65,6 +68,7 @@ case class AppConfig(
                       pickedOutputCsv: String,
                       checkpointFile: String,
                       resume: Boolean,
+                      configPath: String,
                       debug: Boolean,
                       gurobiLicense: String,
                       analyze: Boolean,
@@ -155,6 +159,7 @@ object ArgumentParser {
           pickedOutputCsv = cli.pickedOutputCsv,
           checkpointFile = cli.checkpointFile,
           resume = cli.resume.value,
+          configPath = cli.configPath,
           debug = cli.debug.value,
           gurobiLicense = cli.gurobiLicense,
           analyze = cli.analyze.value,

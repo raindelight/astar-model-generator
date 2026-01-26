@@ -14,7 +14,8 @@ case class ConstraintData(
                            constraint: List[Expression[?]],
                            heuristics: Double,
                            solCount: Long,
-                           exprDepth: Int,
+                           nestingDepth: Int,
+                           symbolCount: Int,
                            distributionScore: Double
                          )
 
@@ -26,22 +27,28 @@ object ConstraintPicker extends LogTrait {
   var config: AppConfig = AppConfig.get
 
 
-  private def order(item: ConstraintData): Double = item.distributionScore
+  private def order(item: ConstraintData): Double = {
+    item.solCount.toDouble * item.distributionScore
+  }
 
   var queue: mutable.PriorityQueue[ConstraintData] = mutable.PriorityQueue[ConstraintData]()(Ordering.by(order))
 
   def runInitial(nodes: mutable.Set[ModelNodeTMP], maxRounds: Int = 3, keepRatio: Double = 0.5, threshold: Int = 500): Unit = {
+    val (distMean, distStd) = DistributionScorer.getParams(config.modelPath)
+    info(s"Distribution Params for '${config.modelPath}': Mean=$distMean, Std=$distStd")
+
     val initialWorkload = nodes.par
     val validSingles = new mutable.ListBuffer[Expression[?]]()
     val round1Results = new mutable.ListBuffer[ConstraintData]()
 
-    info("Starting single evaluation using minizinc with Normal Distribution Scoring")
+    info("Starting single evaluation using minizinc with Symbol Count Scoring")
 
     initialWorkload.foreach { tmpNode =>
       val expr = tmpNode.constraint
 
-      val size = expr.complexity
-      val distScore = DistributionScorer.scoreNormal(size)
+      val depth = expr.exprDepth
+      val symbols = expr.symbolCount
+      val distScore = DistributionScorer.scoreNormal(symbols, distMean, distStd)
 
       val tmpFile = ConstraintSaver.save(expr)
       val runner = new Runner(this.config)
@@ -49,7 +56,7 @@ object ConstraintPicker extends LogTrait {
 
       solCount match {
         case Some(value) if (value >= threshold) => {
-          val data = ConstraintData(List(expr), tmpNode.f, value, size, distScore)
+          val data = ConstraintData(List(expr), tmpNode.f, value, depth, symbols, distScore)
 
           queue.synchronized {
             queue.enqueue(data)
@@ -89,8 +96,12 @@ object ConstraintPicker extends LogTrait {
 
         batchWorkload.foreach { group =>
 
-          val totalSize = group.map(_.complexity).sum
-          val distScore = DistributionScorer.scoreNormal(totalSize)
+          val totalDepth = group.map(_.exprDepth).sum
+          val totalSymbols = group.map(_.symbolCount).sum
+
+          val avgDistScore = group.map(expr =>
+            DistributionScorer.scoreNormal(expr.symbolCount, distMean, distStd)
+          ).sum / group.size
 
           val tmpFile = ConstraintSaver.save(group: _*)
           val runner = new Runner(this.config)
@@ -98,7 +109,7 @@ object ConstraintPicker extends LogTrait {
 
           solCount match {
             case Some(value) if (value >= threshold) => {
-              val data = ConstraintData(group, 0.0, value, totalSize, distScore)
+              val data = ConstraintData(group, 0.0, value, totalDepth, totalSymbols, avgDistScore)
               queue.synchronized {
                 queue.enqueue(data)
               }
