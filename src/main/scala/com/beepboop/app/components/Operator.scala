@@ -322,3 +322,19 @@ case class BoolToIntOperator[T: ClassTag]()(implicit strategy: BoolToIntConverti
     scalaTypeToExprType(classOf[Integer])
   )
 }
+
+case class EquivalentOperator[T: ClassTag]()(implicit strategy: Equatable[T]) extends BinaryOperator[Boolean] {
+  override def eval(left: Any, right: Any): Boolean = {
+    strategy.equal(left.asInstanceOf[T], right.asInstanceOf[T])
+  }
+
+  override def toString: String = "<->"
+
+  override def signature: Signature = {
+    Signature(List(BoolType, BoolType), BoolType)
+  }
+
+  override def distance(left: Any, right: Any): Int = {
+    strategy.distance(left.asInstanceOf[T], right.asInstanceOf[T])
+  }
+}

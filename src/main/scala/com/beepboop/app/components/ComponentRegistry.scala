@@ -21,6 +21,7 @@ sealed trait ExpressionType
 case object IntType extends ExpressionType
 case object BoolType extends ExpressionType
 case object ListIntType extends ExpressionType
+case object ListListIntType extends ExpressionType
 case object ListBoolType extends ExpressionType
 case object SetIntType extends ExpressionType
 case object IteratorType extends ExpressionType
@@ -90,9 +91,9 @@ object ComponentRegistry extends LogTrait {
 
     // relational
     new EqualOperator[Integer],
-    new EqualOperator[Boolean],
     new EqualOperator[List[Integer]],
     new EqualOperator[Set[Integer]],
+    new EquivalentOperator[Boolean],
 
     new NotEqualOperator[Integer](),
     new NotEqualOperator[Boolean](),

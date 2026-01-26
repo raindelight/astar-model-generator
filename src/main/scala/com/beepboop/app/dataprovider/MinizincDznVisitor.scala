@@ -9,9 +9,8 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
 
   private val itemMap = dataItems.map(i => i.name -> i).toMap
 
-
   override def visitAssign_item(ctx: NewMinizincParser.Assign_itemContext): Any = {
-    val id = ctx.ident().getText
+    val id = if (ctx.ident() != null) ctx.ident().getText else ctx.getChild(0).getText
     val valueExpr = ctx.expr()
 
     itemMap.get(id) match {
@@ -22,7 +21,6 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
     }
     null
   }
-
 
   override def visitExpr(ctx: NewMinizincParser.ExprContext): Any = {
     val left = visit(ctx.expr_atom())
@@ -40,12 +38,40 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
     left
   }
 
-
   override def visitExpr_atom(ctx: NewMinizincParser.Expr_atomContext): Any = {
-    if (ctx.expr_atom_head() != null) {
-      return visit(ctx.expr_atom_head())
+    val headValue = if (ctx.expr_atom_head() != null) visit(ctx.expr_atom_head()) else null
+
+    if (headValue == "array2d" && ctx.expr_atom_tail() != null) {
+      val tail = ctx.expr_atom_tail()
+
+      if (tail.getStart.getType == NewMinizincParser.LPAREN) {
+
+        val args = tail.getRuleContexts(classOf[NewMinizincParser.ExprContext])
+          .asScala
+          .map(visit)
+          .toList
+
+        if (args.length == 3) {
+          val colsArg = args(1)
+          val listArg = args(2) match {
+            case l: List[_] => l
+            case other => List(other)
+          }
+
+          val colCount = colsArg match {
+            case i: Int => i
+            case s: Set[_] => s.size
+            case l: List[_] => l.size
+            case _ => 0
+          }
+
+          if (colCount > 0) {
+            return listArg.grouped(colCount).toList
+          }
+        }
+      }
     }
-    super.visitExpr_atom(ctx)
+    headValue
   }
 
   override def visitExpr_atom_head(ctx: NewMinizincParser.Expr_atom_headContext): Any = {
@@ -59,9 +85,8 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
 
     if (ctx.LPAREN() != null && ctx.expr() != null) return visit(ctx.expr())
 
-    super.visitExpr_atom_head(ctx)
+    ctx.getText
   }
-
 
   override def visitInt_literal(ctx: NewMinizincParser.Int_literalContext): Any =
     ctx.getText.toInt
@@ -77,7 +102,6 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
     if (txt.length >= 2) txt.substring(1, txt.length - 1) else txt
   }
 
-
   override def visitArray_literal(ctx: NewMinizincParser.Array_literalContext): Any = {
     if (ctx.expr() == null) return List.empty
     ctx.expr().asScala.map(visit).toList
@@ -89,7 +113,6 @@ class MinizincDznVisitor(dataItems: List[DataItem]) extends NewMinizincParserBas
       rowCtx.expr().asScala.map(visit).toList
     }.toList
   }
-
 
   override def visitSet_literal(ctx: NewMinizincParser.Set_literalContext): Any = {
     if (ctx.expr() == null) return Set.empty

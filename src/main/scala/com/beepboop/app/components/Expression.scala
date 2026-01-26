@@ -192,12 +192,15 @@ case class ArrayElement[ReturnT : ClassTag](
 object ArrayElement {
   def asCreatable[T: ClassTag](): Creatable = new Creatable with AutoNamed {
     override def templateSignature: Signature = {
-      val listInputType = scalaTypeToExprType(classTag[List[T]].runtimeClass)
-      val intInputType = scalaTypeToExprType(classOf[Integer])
-      val singleOutputType = scalaTypeToExprType(classTag[T].runtimeClass)
-      Signature(inputs = List(listInputType, intInputType), output = singleOutputType)
-    }
+      val elementExprType = scalaTypeToExprType(classTag[T].runtimeClass)
+      val listInputType =  if (elementExprType == IntType) {
+        ListIntType
+      } else ListListIntType
 
+      val singleOutputType = elementExprType
+
+      Signature(inputs = List(listInputType, IntType), output = singleOutputType)
+    }
     override def create(children: List[Expression[?]]): Expression[T] = {
       require(children.length == 2, "ArrayElement requires two children.")
 
@@ -507,6 +510,7 @@ case class ForAllExpression[IterT](
 
   override def getAdditionalPolicies: List[Policy] = {
     List(EnsureSpecificVarExists(iteratorDef.variableName))
+    //List.empty
   }
 
   override def toString: String = s"forall($iteratorDef)($body)"
@@ -1182,6 +1186,9 @@ case class DiffnExpression(
 
       val n = xVal.size
       var totalOverlapArea = 0
+      
+      
+      require(yVal.size == n && dxVal.size == n && dyVal.size == n, "All input arrays for diffn must have the same length")
 
       for (i <- 0 until n; j <- (i + 1) until n) {
         totalOverlapArea += intersectionArea(
@@ -1707,3 +1714,4 @@ object SymmetryBreakingExpression {
     override def ownerClass: Class[_] = SymmetryBreakingExpression.getClass
   }
 }
+

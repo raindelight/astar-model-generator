@@ -149,12 +149,14 @@ object DataProvider extends LogTrait {
       this.parameters = instanceParams
       DataImporter.importDataFile(dPath, instanceParams)
 
+
+
       val paramMap: Map[String, Any] = instanceParams
         .filter(p => p.value != null && p.value != None)
         .map(p => p.name -> p.value)
         .toMap
 
-      val instanceSolutions: List[Map[String, Any]] = SolutionParser.parse(sPath, separator = ';', this.variables)
+      val instanceSolutions: List[Map[String, Any]] = SolutionParser.parse(sPath, separator = ';', this.variables ++ this.parameters)
 
       info(s"    -> Loaded ${instanceSolutions.size} solutions.")
 
@@ -179,11 +181,18 @@ object DataProvider extends LogTrait {
 
     (variables ++ parameters).sortBy(_.name).foreach { item =>
       val internalKind = if (item.isVar) "VAR" else "PAR"
-      val internalType = getExpressionType(item)
+
+      val internalType = previewCtx.get(item.name) match {
+        case Some(value) => inferTypeFromValue(value)
+        case None => getExpressionType(item)
+      }
 
       val valuePreview = previewCtx.get(item.name) match {
+        case Some(l: List[_]) if l.nonEmpty && l.head.isInstanceOf[List[_]] =>
+          val inner = l.head.asInstanceOf[List[_]]
+          s"List[List] (size=${l.size}x${inner.size})"
         case Some(l: List[_]) =>
-          if (l.nonEmpty && l.head.isInstanceOf[Set[_]]) s"List[Set] (size=${l.size}, first=${l.head})"
+          if (l.nonEmpty && l.head.isInstanceOf[Set[_]]) s"List[Set] (size=${l.size})"
           else s"List (size=${l.size})"
         case Some(s: Set[_]) => s"Set (size=${s.size})"
         case Some(v) => v.toString
@@ -192,7 +201,7 @@ object DataProvider extends LogTrait {
 
       info(f"[$internalKind] ${item.name}%-20s | Type: ${internalType.toString}%-15s | Val: $valuePreview")
     }
-    info("==============================================================\n")
+    info ("==============================================================\n")
 
     initializeCreatables(solutionContexts.head, modelParamsSchema)
   }
@@ -201,7 +210,9 @@ object DataProvider extends LogTrait {
     val groupedItems = sampleContext.groupBy { case (name, value) =>
       val schemaItem = variables.find(_.name == name).orElse(paramSchema.find(_.name == name))
       schemaItem match {
-        case Some(item) => getExpressionType(item)
+        case Some(item) =>
+          val schemaType = getExpressionType(item)
+          if (schemaType == UnknownType) inferTypeFromValue(value) else schemaType
         case None => inferTypeFromValue(value)
       }
     }
@@ -213,6 +224,7 @@ object DataProvider extends LogTrait {
     )
   }
 
+
   def getExpressionType(item: DataItem): ExpressionType = {
     val typeStr = Option(item.detailedDataType)
       .map(_.dataType.toLowerCase)
@@ -221,8 +233,22 @@ object DataProvider extends LogTrait {
     val isArray = Option(item.detailedDataType).exists(_.isArray)
     val isSet = Option(item.detailedDataType).exists(_.isSet)
 
+    val valueBasedType = (variables ++ parameters)
+      .find(_.name == item.name)
+      .flatMap(i => Option(i.value))
+      .map(inferTypeFromValue)
+
+    if (valueBasedType.isDefined) {
+      return valueBasedType.get
+    }
+
     if (isArray && isSet) ListSetIntType
-    else if (isArray) ListIntType
+    else if (isArray) {
+      val is2D = Option(item.detailedDataType)
+        .exists(dt => dt.dimensions != null && dt.dimensions.size >= 2)
+      if (is2D) ListListIntType
+      else ListIntType
+    }
     else if (isSet) ListIntType
     else if (typeStr.contains("bool")) BoolType
     else if (typeStr.contains("int") || typeStr.contains("..")) IntType
@@ -234,12 +260,19 @@ object DataProvider extends LogTrait {
       }
     }
   }
-
   private def inferTypeFromValue(value: Any): ExpressionType = value match {
     case _: Int | _: java.lang.Integer => IntType
     case _: Boolean | _: java.lang.Boolean => BoolType
-    case l: List[_] if l.nonEmpty && l.head.isInstanceOf[Int] => ListIntType
-    case l: List[_] if l.nonEmpty && l.head.isInstanceOf[Set[_]] => ListSetIntType
+    case i: Int => IntType
+    case b: Boolean => BoolType
+    case l: List[_] =>
+      if (l.nonEmpty && l.head.isInstanceOf[List[_]]) {
+        ListListIntType
+      } else if (l.nonEmpty && l.head.isInstanceOf[Set[_]]) {
+        ListSetIntType
+      } else {
+        ListIntType
+      }
     case _: Set[_] => SetIntType
     case _ => UnknownType
   }
