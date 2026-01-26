@@ -33,6 +33,8 @@ object MainApp extends LogTrait {
     if (configOpt.isEmpty) return
     val config = configOpt.get
 
+    com.beepboop.app.dataprovider.ConfigLoader.initialize(config.configPath)
+
     info("--- Step 1: Configuration ---")
     info(s"Model: ${config.modelPath}")
     info(s"Max Iterations: ${config.maxIterations}")
