@@ -1,0 +1,3 @@
+Constraint_String|Depth_g|Heuristic_h|Score_f
+( ( 0 != 8 ) -> ( true and true ) )|1|0|1
+( ( D != 8 ) -> ( true and true ) )|2|0|2

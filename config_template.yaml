@@ -1,0 +1,151 @@
+mutations:
+  - type: replace-operator
+    enabled: true
+
+  - type: transform-variable-to-constant
+    enabled: true
+
+  - type: transform-constant-to-variable
+    enabled: true
+
+  - type: change-variable
+    enabled: true
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 1
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 2
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 3
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 4
+
+  - type: generate
+
+expression-weights:
+  Variable: 1.0
+  Constant: 1.0
+  ArrayElement: 1.0
+  BinaryExpression: 1.0
+  UnaryExpression: 1.0
+  CountExpression: 1.0
+  SumExpression: 1.0
+  ForAllExpression: 1.0
+  ExistsExpression: 1.0
+  LexicographicalExpression: 1.0
+  MinimumExpression: 1.0
+  MaximumExpression: 1.0
+  CumulativeExpression: 1.0
+  GlobalCardinalityExpression: 1.0
+  DiffnExpression: 1.0
+  ValuePrecedesChainExpression: 1.0
+  AllDifferentExpression: 1.0
+  RedundantConstraint: 0.0
+  StrEqExpression: 0.0
+
+
+logging:
+  enabled: true
+  log-debug: false
+  classes:
+    com.beepboop.app.MainApp:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataImporter:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.dataprovider.SolutionParser:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.ge_interpreter.AStarPhenotypeGenerator:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.mutations.MutationEngine:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.mutations.Mutation:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.mutations.ReplaceOperator:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.mutations.ExpressionGenerator:
+      level: DEBUG
+      enabled: false
+
+
+    com.beepboop.app.mutations.ReplaceSubtree:
+      level: DEBUG
+      enabled: false
+
+
+    com.beepboop.app.dataprovider.ModelParser:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataProvider:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataProvider$VarRegistry:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.dataprovider.DataProvider$ParameterRegistry:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.components.BinaryExpression:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.components.SumExpression:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.astar.AStar:
+      level: INFO
+      enabled: true
+
+    com.beepboop.app.dataprovider.PersistenceManager:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.components.ComponentRegistry:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.postprocessor.JoinConstants:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.cpicker.Runner:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.cpicker.ConstraintPicker:
+      level: INFO
+      enabled: true
+
+    com.beepboop.app.components.DiffnExpression:
+      level: DEBUG
+      enabled: false

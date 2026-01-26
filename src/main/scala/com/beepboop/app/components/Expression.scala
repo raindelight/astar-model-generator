@@ -77,6 +77,10 @@ abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends L
       s"$opName(${comp.children.map(_.structuralSignature).mkString(",")})"
     case _ => "UNKNOWN"
   }
+  def symbolCount: Int = this match {
+    case c: ComposableExpression => c.children.map(_.symbolCount).sum
+    case v: Variable[?] => 1
+  }
 }
 
 case class Variable[ReturnT : ClassTag ](name: String, domain: Option[Expression[?]] = None) extends Expression[ReturnT] {
@@ -214,7 +218,7 @@ object ArrayElement {
       )
     }
 
-    override def ownerClass: Class[_] = ArrayElement.getClass // [cite: 180]
+    override def ownerClass: Class[_] = ArrayElement.getClass
   }
 }
 
