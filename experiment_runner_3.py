@@ -21,19 +21,37 @@ HEURISTIC = "avg"
 # Wartość: Lista ciągów znaków. Jeśli typ mutacji (z pola 'type' w yaml) zawiera
 # którykolwiek z tych ciągów, mutacja zostaje włączona.
 MUTATION_SETS = {
-    # 1. Wszystkie mutacje dostępne w szablonie
+    # 1. Wszystkie mutacje dostępne w szablonie (w tym Crossover, jeśli jest w configu)
     "All": ["ALL"],
 
-    # 2. Tylko generacja i selekcja (brak mutacji w sensie modyfikacji istniejących)
+    # 2. Brak mutacji (tylko generacja początkowa + ewentualnie Crossover, jeśli nie jest traktowany jako Mutation w YAML)
+    # Jeśli Crossover jest na liście mutacji w YAML, to też zostanie wyłączony.
     "None": [],
 
-    # 3. Przykład: Tylko mutacje liczbowe (IntMutation)
-    "Only_Int": ["IntMutation"],
+    # 3. Zmiany tylko na poziomie liści (zmienne i stałe)
+    "Leaf_Tweaks": [
+        "change-variable",
+        "transform-variable-to-constant",
+        "transform-constant-to-variable"
+    ],
 
-    # 4. Przykład: Wszystko OPRÓCZ krzyżowania (zakładając nazwę klasy SmartCrossover)
-    # Tu musimy wymienić wszystkie INNE, które chcemy zachować.
-    # To podejście "whitelist" jest bezpieczniejsze.
-    "No_Crossover": ["IntMutation", "BoolMutation", "TypeAwareMutation", "ReplaceTokenMutation"]
+    # 4. Zmiany strukturalne
+    "Structural_Changes": [
+        "replace-operator",
+        "replace-subtree"
+    ],
+
+    # 5. Bez niszczenia poddrzew (Bez ReplaceSubtree)
+    "No_Random_Subtree": [
+        "change-variable",
+        "transform-variable-to-constant",
+        "transform-constant-to-variable",
+        "replace-operator",
+        "generate-all-diffn"
+    ],
+
+    # 6. Specyficzne dla problemów geometrycznych/pakowania (jeśli dotyczy)
+    "Diffn_Focus": ["generate-all-diffn"]
 }
 
 PROBLEMS = {
