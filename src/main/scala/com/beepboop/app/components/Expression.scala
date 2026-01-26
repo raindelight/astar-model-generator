@@ -55,6 +55,10 @@ abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends L
     case c: ComposableExpression => 1 + c.children.map(_.exprDepth).sum
     case _ => 1
   }
+  def symbolCount: Int = this match {
+    case c: ComposableExpression => c.children.map(_.symbolCount).sum
+    case _ => 1
+  }
 }
 
 case class Variable[ReturnT : ClassTag ](name: String) extends Expression[ReturnT] {
