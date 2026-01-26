@@ -20,3 +20,4 @@ case class AlgorithmConfig(
                             mutations: List[Mutation],
                             logging: LogConfig
                           ) derives ConfigReader
+

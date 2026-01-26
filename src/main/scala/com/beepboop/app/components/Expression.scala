@@ -218,7 +218,7 @@ object ArrayElement {
       )
     }
 
-    override def ownerClass: Class[_] = ArrayElement.getClass // [cite: 180]
+    override def ownerClass: Class[_] = ArrayElement.getClass
   }
 }
 

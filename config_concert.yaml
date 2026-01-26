@@ -1,0 +1,214 @@
+mutations:
+  - type: replace-operator
+    enabled: true
+
+  - type: transform-variable-to-constant
+    enabled: true
+
+  - type: transform-constant-to-variable
+    enabled: true
+
+  - type: change-variable
+    enabled: true
+
+  # Crucial for generating logic blocks
+  - type: replace-subtree
+    enabled: true
+    max-depth: 1
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 2
+
+  - type: replace-subtree
+    enabled: true
+    max-depth: 3
+
+  # Disabled depth 4 to prevent overly complex/bloated trees initially
+  - type: replace-subtree
+    enabled: false
+    max-depth: 4
+
+  # CRITICAL: Connects loop iterators (e.g., 'o') to array indices (e.g., 'start[o]')
+  - type: iterator-coupling
+    enabled: true
+
+  # Helps simplify trees that got too deep/complex
+  - type: unwrap-expression
+    enabled: true
+
+  # Helps remove dead branches
+  - type: prune-to-leaf
+    enabled: true
+
+  # CRITICAL: Necessary to create the 'forall' loops (C1, C2, C3, Symmetry)
+  - type: inject-quantifier
+    enabled: true
+
+  # 'Diffn' is for the Accap model, not Concert Hall
+  - type: generate-all-diffn
+    enabled: false
+
+  - type: inject-nested-loop
+    enabled: false
+
+
+expression-weights:
+  # Arithmetic
+  AddOperator: 1.0
+  SubOperator: 1.0
+  MulOperator: 10.0 # High weight: Used in Objective Function (price * assign)
+  DivOperator: 0.1
+  ModOperator: 0.1
+
+  # Comparison
+  EqualOperator: 5.0 # High weight: Used for Objective definition
+  NotEqualOperator: 1.0
+  LessOperator: 1.0
+  GreaterOperator: 5.0 # High weight: Used for (assign[o] > 0)
+  LessEqualOperator: 1.0
+  GreaterEqualOperator: 5.0 # High weight: Used for capacity >= requirement
+
+  # Logic
+  AndOperator: 1.0
+  OrOperator: 1.0
+  XorOperator: 0.1
+  ImpliesOperator: 10.0 # High weight: Essential for C2 (Constraint 2: assign > 0 -> capacity OK)
+  NotOperator: 1.0
+
+  # Unary
+  NegateOperator: 0.1
+  AbsOperator: 0.1
+  BoolToIntOperator: 10.0 # High weight: Essential for Objective (converting boolean check to 0/1)
+
+  # Sets
+  ContainsOperator: 1.0
+  SetComprehensionExpression: 20.0 # Very High: Used in C1 (cliques) and C3 (Objective sum)
+
+  # Global Constraints / Specific Structures
+  SumExpression: 10.0 # High: Objective function
+  CountExpression: 1.0
+  AllDifferentExpression: 1.0
+  AllDifferentExceptZeroExpression: 50.0 # Very High: The signature constraint of this model (C1)
+
+  ValuePrecedesChainExpression: 20.0 # High: Used for Symmetry Breaking
+  SymmetryBreakingExpression: 20.0 # High: Used for Symmetry Breaking
+
+  ArgSortExpression: 5.0 # Used in variable ordering/output, helpful to have available
+  StrEqExpression: 0.1 # Not used here
+
+  # Basic Building Blocks
+  ForAllExpression: 50.0 # Critical: Top-level structure for nearly all constraints
+  ExistsExpression: 1.0
+  Variable: 5.0
+  Constant: 2.0
+  ArrayElement: 20.0 # Critical: Accessing arrays (start[o], assign[o], etc.)
+
+  # Unused in this model (Reduce noise)
+  MinimumExpression: 0.1
+  MaximumExpression: 0.1
+  GlobalCardinalityExpression: 0.0
+  DiffnExpression: 0.0
+  CumulativeExpression: 0.0
+  LexicographicalExpression: 0.0
+
+
+
+logging:
+  enabled: true
+  log-debug: false
+  classes:
+    com.beepboop.app.MainApp:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataImporter:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.dataprovider.SolutionParser:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.ge_interpreter.AStarPhenotypeGenerator:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.mutations.MutationEngine:
+      level: INFO
+      enabled: true
+
+
+    com.beepboop.app.mutations.Mutation:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.mutations.ReplaceOperator:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.mutations.ExpressionGenerator:
+      level: DEBUG
+      enabled: false
+
+
+    com.beepboop.app.mutations.ReplaceSubtree:
+      level: DEBUG
+      enabled: false
+
+
+    com.beepboop.app.dataprovider.ModelParser:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataProvider:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.dataprovider.DataProvider$VarRegistry:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.dataprovider.DataProvider$ParameterRegistry:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.components.BinaryExpression:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.components.SumExpression:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.astar.AStar:
+      level: INFO
+      enabled: true
+
+    com.beepboop.app.dataprovider.PersistenceManager:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.components.ComponentRegistry:
+      level: DEBUG
+      enabled: true
+
+    com.beepboop.app.postprocessor.JoinConstants:
+      level: DEBUG
+      enabled: false
+
+    com.beepboop.app.cpicker.Runner:
+      level: DEBUG
+      enabled: true
+
+
+    com.beepboop.app.cpicker.ConstraintPicker:
+      level: INFO
+      enabled: true
+
+    com.beepboop.app.components.DiffnExpression:
+      level: DEBUG
+      enabled: false
