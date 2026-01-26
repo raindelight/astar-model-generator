@@ -35,6 +35,7 @@ object MainApp extends LogTrait {
     AppConfig.init(config)
 
     info("--- Step 1: Configuration ---")
+    info(s"Config: ${config.config}")
     info(s"Model: ${config.modelPath}")
     info(s"Max Iterations: ${config.maxIterations}")
     info(s"Output CSV: ${config.outputCsv}")
@@ -104,7 +105,8 @@ object MainApp extends LogTrait {
     }))
 
     val initialExpr = ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2)
-      .getOrElse(Constant(value = false))
+     .getOrElse(Constant(value = false))
+    
 
     info("--- Step 3: Starting Optimization Loop ---")
 
