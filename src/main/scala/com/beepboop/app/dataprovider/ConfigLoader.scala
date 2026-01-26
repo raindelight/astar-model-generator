@@ -15,3 +15,8 @@ case class LogConfig(
                       classes: Map[String, ClassLogConfig]
                     ) derives ConfigReader
 
+case class AlgorithmConfig(
+                            expressionWeights: Map[String, Double],
+                            mutations: List[Mutation],
+                            logging: LogConfig
+                          ) derives ConfigReader
