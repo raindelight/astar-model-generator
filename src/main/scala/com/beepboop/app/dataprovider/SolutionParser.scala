@@ -32,7 +32,12 @@ object SolutionParser extends LogTrait {
                 val dataTypeOption = schema.get(header).flatMap(Option(_))
                 val parsedValue = dataTypeOption match {
                   case Some(dataType) => parseValue(valueStr, dataType)
-                  case None           => valueStr
+                  case None =>
+                    if (valueStr.startsWith("[") && valueStr.endsWith("]")) {
+                      parseComplexArray(valueStr, "unknown")
+                    } else {
+                      parseScalar(valueStr, "unknown")
+                    }
                 }
                 header -> parsedValue
               }.toMap
@@ -156,7 +161,9 @@ object SolutionParser extends LogTrait {
       scala.util.Try(cleanValue.toInt).getOrElse(cleanValue)
     }
     else {
-      cleanValue
+      scala.util.Try(cleanValue.toInt)
+        .orElse(scala.util.Try(cleanValue.toDouble))
+        .getOrElse(cleanValue)
     }
   }
 }

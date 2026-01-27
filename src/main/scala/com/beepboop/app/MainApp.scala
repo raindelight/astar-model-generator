@@ -103,10 +103,10 @@ object MainApp extends LogTrait {
         PersistenceManager.performEmergencyBackup(snapshot, config.checkpointFile, config.outputCsv)
       }
     }))
-
     val initialExpr = Iterator.continually {
       ExpressionGenerator.generate(requiredType = BoolType, maxDepth = 2)
     }.find(_.isDefined).flatten
+
 
     info("--- Step 3: Starting Optimization Loop ---")
 
