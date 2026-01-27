@@ -1167,7 +1167,7 @@ case class DiffnExpression(
       true
     } catch {
       case e: Exception =>
-        error(e.getMessage)
+        error(e.getMessage + e.toString)
         throw e
     }
   }
