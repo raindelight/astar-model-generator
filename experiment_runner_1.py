@@ -10,14 +10,14 @@ RESULTS_DIR = os.path.join(PROJECT_ROOT, "experiment_results")
 USER_HOME = str(Path.home())
 GUROBI_LICENSE = os.path.join(USER_HOME, "development", "gurobi.lic")
 
-ITERATIONS = [100, 250, 500, 750, 1000]
-HEURISTICS = ["avg", "min", "max", "mse", "var"]
+ITERATIONS = [100, 1000, 10000]
+HEURISTICS = ["avg", "min", "mse", "var"]
 
 PROBLEMS = {
     "Accap": {
         "model": "models/mznc2024_probs/accap/accap.mzn",
-        "data": ["models/accap_a10_f80_t50.json", "models/accap_a3_f20_t10.json", "models/accap_a8_f50_t30.json", "models/accap_a20_f160_t90.json"],
-        "sols": ["models/accap_sols_a10.csv", "models/accap.a3.csv", "models/accap.a8.csv", "models/accap.a20.csv"],
+        "data": ["models/accap_a10_f80_t50.json", "models/accap_a3_f20_t10.json", "models/accap_a8_f50_t30.json"],
+        "sols": ["models/accap_sols_a10.csv", "models/accap.a3.csv", "models/accap.a8.csv"],
         "config_path": "config_accap.yaml"
     }
 }
