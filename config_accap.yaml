@@ -56,7 +56,7 @@ expression-weights:
   GreaterOperator: 0.0
   GreaterEqualOperator: 0.0
 
-  ImpliesOperator: 1.0
+  ImpliesOperator: 0.0
   AndOperator: 0.0
   OrOperator: 0.0
   XorOperator: 0.0
@@ -68,7 +68,7 @@ expression-weights:
 
   ContainsOperator: 0.0
 
-  DiffnExpression: 50.0
+  DiffnExpression: 1.0
   SumExpression: 1.0
   ForAllExpression: 10.0
 
