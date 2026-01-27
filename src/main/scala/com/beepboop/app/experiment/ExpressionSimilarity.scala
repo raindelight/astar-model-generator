@@ -358,13 +358,13 @@ object ModelLoader extends LogTrait {
 object SimilarityCSVExporter {
   def dumpToCSV(report: List[NodeSimilarityRow], targetLabels: List[String], filePath: String): Unit = {
     val writer = new PrintWriter(new File(filePath))
-    val header = (List("Node", "Class", "H_Value", "complexity") ++ targetLabels).mkString(",")
+    val header = (List("Node", "Class", "H_Value", "complexity") ++ targetLabels).mkString(";")
     writer.println(header)
 
     report.foreach { row =>
       val scores = targetLabels.map(label => "%.4f".format(row.scores.getOrElse(label, 0.0)))
       val cleanNode = s"\"${row.nodeString.replace("\"", "'")}\""
-      val line = (List(cleanNode, row.nodeClass, row.hValue, row.complexity) ++ scores).mkString(",")
+      val line = (List(cleanNode, row.nodeClass, row.hValue, row.complexity) ++ scores).mkString(";")
       writer.println(line)
     }
     writer.close()

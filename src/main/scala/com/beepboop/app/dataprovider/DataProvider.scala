@@ -207,13 +207,16 @@ object DataProvider extends LogTrait {
   }
 
   private def initializeCreatables(sampleContext: Map[String, Any], paramSchema: List[DataItem]): Unit = {
+
     val groupedItems = sampleContext.groupBy { case (name, value) =>
       val schemaItem = variables.find(_.name == name).orElse(paramSchema.find(_.name == name))
+
       schemaItem match {
         case Some(item) =>
           val schemaType = getExpressionType(item)
           if (schemaType == UnknownType) inferTypeFromValue(value) else schemaType
-        case None => inferTypeFromValue(value)
+        case None =>
+          inferTypeFromValue(value)
       }
     }
 
@@ -222,8 +225,12 @@ object DataProvider extends LogTrait {
         new RandomVariableFactory(exprType, itemsMap.keys.toList)
       }.toList
     )
-  }
 
+    // Optional: Log what was found
+    groupedItems.foreach { case (t, vars) =>
+      info(s"Initialized factory for type $t with ${vars.size} variables.")
+    }
+  }
 
   def getExpressionType(item: DataItem): ExpressionType = {
     val typeStr = Option(item.detailedDataType)

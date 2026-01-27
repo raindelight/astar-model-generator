@@ -43,28 +43,7 @@ mutations:
 
 
 expression-weights:
-
-  heuristic_penalty_complexity: 2.0
-
-  # Penalty added if a neighbor is structurally identical to the current node.
-  # Higher value = forces the search to explore different structures more aggressively.
-  # Default in code: 80.0
-  heuristic_penalty_identical: 100.0
-
-  # Penalty multiplier for frequently seen structural signatures.
-  # Higher value = discourages revisiting the same expression structures.
-  # Default in code: 5.0
-  heuristic_penalty_frequency: 10.0
-
-  # Beta value for the F-score calculation (balance between precision/recall in distance).
-  # Default in code: 2.0
-  heuristic_beta: 1.5
-
-  # Scaling factor for the final integer heuristic score.
-  # Default in code: 1000.0
-  heuristic_scaling: 5000.0
-  heuristic_loop_discount_g: 0.5
-  heuristic_loop_discount_h: 0.15
+{weights_block}
 
 
   AddOperator: 1.0

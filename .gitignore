@@ -5,6 +5,8 @@ astar_checkpoint.bin
 generated_constraints.csv
 queue.csv
 gurobi.log
+experiment*/**/*
+experiment*
 
 hs_err_pid*
 dist/*
