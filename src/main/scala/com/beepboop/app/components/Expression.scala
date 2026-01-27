@@ -16,6 +16,20 @@ import scala.reflect.ensureAccessible
 /* third party modules */
 import scala.reflect.{ClassTag, classTag}
 
+object TypeHelper {
+  def deriveListType(elementClass: Class[?]): ExpressionType = {
+    val elementType = scalaTypeToExprType(elementClass)
+    elementType match {
+      case IntType => ListIntType
+      case BoolType => ListBoolType
+      case ListIntType => ListListIntType
+      case SetIntType => ListSetIntType
+      case _ => ListAnyType
+    }
+  }
+}
+
+
 def stringWithSpaces(strings: String*): String = {
   strings.mkString(" ")
 }
@@ -83,20 +97,29 @@ abstract class Expression[ReturnT](implicit val ct: ClassTag[ReturnT]) extends L
   }
 }
 
-case class Variable[ReturnT : ClassTag ](name: String, domain: Option[Expression[?]] = None) extends Expression[ReturnT] {
+case class Variable[ReturnT : ClassTag ](name: String, domain: Option[Expression[?]] = None, explicitType: Option[ExpressionType] = None) extends Expression[ReturnT] {
   override def toString: String = name
   override def evalToString: String = eval.toString
+
   override def signature: Signature = {
-    val outputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    val outputType = explicitType.getOrElse {
+      scalaTypeToExprType(classTag[ReturnT].runtimeClass)
+    }
     Signature(inputs = Nil, output = outputType)
   }
   override def eval(context: Map[String, Any]): ReturnT = {
     context.get(name) match {
-      case Some(value) => value.asInstanceOf[ReturnT]
-      case None => throw new NoSuchElementException(s"Variable '$name' not found in evaluation context.")
+      case Some(value) =>
+        val effectiveValue = value match {
+          case Some(inner) => inner
+          case _ => value
+        }
+        effectiveValue.asInstanceOf[ReturnT]
+
+      case None =>
+        throw new NoSuchElementException(s"Variable '$name' not found in evaluation context.")
     }
   }
-
   def getOffset(context: Map[String, Any]): Int = domain match {
     case Some(expr) =>
       expr.eval(context) match {
@@ -181,10 +204,12 @@ case class ArrayElement[ReturnT : ClassTag](
   override def evalToString: String = s"${variable.toString}[${index.evalToString}]"
 
   override def signature: Signature = {
-    val listInputType = scalaTypeToExprType(classTag[List[ReturnT]].runtimeClass)
-    val intInputType = scalaTypeToExprType(classTag[Integer].runtimeClass)
+    val listInputType = TypeHelper.deriveListType(classTag[ReturnT].runtimeClass)
+
+    val intInputType = IntType
     val singleOutputType = scalaTypeToExprType(classTag[ReturnT].runtimeClass)
-    Signature(inputs = List(listInputType,  intInputType), singleOutputType)
+
+    Signature(inputs = List(listInputType, intInputType), output = singleOutputType)
   }
 
 }

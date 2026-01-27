@@ -1,7 +1,7 @@
 package com.beepboop.app.astar
 
 import com.beepboop.app.*
-import com.beepboop.app.components.{BinaryExpression, BoolType, Expression}
+import com.beepboop.app.components.{BinaryExpression, BoolType, Expression, ForAllExpression}
 import com.beepboop.app.dataprovider.{DataItem, DataProvider}
 import com.beepboop.app.logger.LogTrait
 import com.beepboop.app.logger.Profiler
@@ -14,11 +14,13 @@ import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
 import com.beepboop.app.policy.{Compliant, DenyDiffnInsideQuantifier, DenyDivByZero, EnsureAnyVarExists, MaxDepth, NonCompliant, Scanner}
 import com.beepboop.app.postprocessor.Postprocessor
+import com.beepboop.app.utils.AppConfig
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
+import scala.util.hashing.MurmurHash3
 
 
 case class ModelNode(
@@ -88,6 +90,10 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
 
   private val openSet = mutable.PriorityQueue[ModelNodeTMP]()(ModelNodeTMPOrdering)
   private val visited = mutable.Map[Expression[?], ModelNodeTMP]()
+
+  private val semanticHistory = mutable.Set[Int]()
+  private val structureHistory = mutable.Map[String, Int]().withDefaultValue(0)
+
   private var isInitialized = false
 
   def getSnapshot: AStarSnapshot = {
@@ -98,12 +104,26 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   def restoreState(snapshot: AStarSnapshot): Unit = {
     this.openSet.clear()
     this.visited.clear()
-    snapshot.openSetItems.foreach(item => this.openSet.enqueue(item))
+    this.semanticHistory.clear()
+    this.structureHistory.clear()
 
-    snapshot.visitedItems.foreach(node => visited(node.constraint) = node)
+    snapshot.openSetItems.foreach(item => {
+      this.openSet.enqueue(item)
+      structureHistory(item.constraint.structuralSignature) += 1
+    })
+
+    snapshot.visitedItems.foreach(node => {
+      visited(node.constraint) = node
+      structureHistory(node.constraint.structuralSignature) += 1
+    })
 
     this.isInitialized = true
     warn(s"State restored! Queue: ${openSet.size}, Visited: ${visited.size}")
+  }
+
+  private def getWeight(key: String, default: Double): Double = {
+    val w = AppConfig.getWeight(key)
+    if (w <= 0.0) default else w
   }
 
   def findOptimalModel(
@@ -122,6 +142,8 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
     if (!isInitialized) {
       openSet.clear()
       visited.clear()
+      semanticHistory.clear()
+      structureHistory.clear()
 
       val initial_h = calculateHeuristic(initialConstraint)
       val startNode = ModelNodeTMP(initialConstraint, 1, initial_h)
@@ -140,6 +162,14 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
     }
 
     var iterations = 0
+
+    val wComplexity = getWeight("heuristic_penalty_complexity", 1.0)
+    val wIdentical = getWeight("heuristic_penalty_identical", 80.0)
+    val wFrequency = getWeight("heuristic_penalty_frequency", 5.0)
+
+    val loopDiscountG = getWeight("heuristic_loop_discount_g", 1.0)
+
+    info(s"Steering Params | Complexity: $wComplexity | Identical: $wIdentical | Frequency: $wFrequency | Loop Discount G: $loopDiscountG")
 
     while (openSet.nonEmpty && iterations < maxIterations) {
 
@@ -166,17 +196,34 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
         info(s"Generated neighbors: ${generated.size}")
 
         generated.foreach { neighborConstraint =>
-          val tentativeG = currentNode.g + 1
+          val structSig = neighborConstraint.structuralSignature
+          val isStructurallyIdentical = structSig == currentNode.constraint.structuralSignature
+
+          val structureCount = structureHistory(structSig)
+
+          val identicalPenalty = if (isStructurallyIdentical) wIdentical else 0.0
+          val diversityPenalty = structureCount * wFrequency
+
+          val isLoop = neighborConstraint.isInstanceOf[ForAllExpression[?]]
+          val activeLoopDiscount = if (isLoop) loopDiscountG else 1.0
+
+          val complexityPenalty = neighborConstraint.complexity * wComplexity * activeLoopDiscount
+
+          val tentativeG = currentNode.g + 1 + complexityPenalty.toInt + identicalPenalty.toInt + diversityPenalty.toInt
           val existingG = gScore.getOrElse(neighborConstraint, Int.MaxValue)
 
           if (tentativeG < existingG) {
 
             gScore(neighborConstraint) = tentativeG
 
-            val h = calculateHeuristic(neighborConstraint)
-            val neighborNode = ModelNodeTMP(neighborConstraint, tentativeG, h)
+            structureHistory(structSig) += 1
 
-            openSet.enqueue(neighborNode)
+            val h = calculateHeuristic(neighborConstraint)
+
+            if (h < Int.MaxValue) {
+              val neighborNode = ModelNodeTMP(neighborConstraint, tentativeG, h)
+              openSet.enqueue(neighborNode)
+            }
           }
         }
       }
@@ -195,78 +242,113 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
     val resultNodes = scala.collection.mutable.Set.from(visited.values)
     Some(resultNodes)
   }
+
   private def calculateHeuristic(constraint: Expression[?]): Int = Profiler.profile("calculateHeuristic") {
     if (numSolutions == 0) return Int.MaxValue
 
-    val(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist) = (0 until numSolutions).par.map { i =>
-      try {
-        val context = DataProvider.createSolutionContext(i)
 
-        val isSatisfied = try constraint.eval(context).asInstanceOf[Boolean] catch {
-          case _: ClassCastException => false
-          case _: Exception => false
+    val resultsTry = scala.util.Try {
+      (0 until numSolutions).par.map { i =>
+        val context = DataProvider.getSolutionContext(i)
+        val isSatisfied = try {
+          constraint.eval(context).asInstanceOf[Boolean]
+        } catch {
+          case e: IllegalArgumentException =>
+            Profiler.recordValue(s"Discarded due to IllegalArgumentException: $e", 1)
+            throw e
+          case e: ClassCastException =>
+            Profiler.recordValue(s"ClassCastExceptions: $e", 1)
+            false
+          case e: IndexOutOfBoundsException =>
+            false
+          case e: Exception =>
+            Profiler.recordValue(s"UnknownException: $e", 1)
+            false
         }
 
-        if (isSatisfied) (1, 0.0, 0.0, 0.0, 0.0) else {
-          val rawDist = constraint.distance(context)
-          val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
-          val sqDist = normDist * normDist
-          (0, normDist, normDist, normDist, sqDist)
-        }
-      } catch {
-        case scala.util.control.NonFatal(e) => (0, 1.0, 1.0, 0.0, 0.0)
-      }
-    }.fold((0, 0.0, 1.0, 0.0, 0.0)) { (acc, elem) =>
-      (
-        acc._1 + elem._1,
-        acc._2 + elem._2,
-        math.min(acc._3, elem._3),
-        math.max(acc._4, elem._4),
-        acc._5 + elem._5
-      )
-    }
-    val noiseSamples = 200
-    val noiseSatisfiedCount = (0 until noiseSamples).count { _ =>
-      try {
-        val noiseCtx = DataProvider.createRandomContext()
-        val t = constraint.eval(noiseCtx).asInstanceOf[Boolean]
-        Profiler.recordValue("No Exception in noise sampling", 1)
-        t
-      } catch {
-        case e: Exception => {
-          //warn(e.getMessage)
-          Profiler.recordValue("Exception in noise sampling", 1)
-          true
-        }
+        val rawDist = constraint.distance(context)
+        val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
+        val currentSatisfaction = if (isSatisfied) 1 else 0
+
+        (currentSatisfaction, normDist, normDist, normDist, normDist * normDist)
       }
     }
 
-    val noiseRate = noiseSatisfiedCount.toDouble / noiseSamples
-    val entropyWeight = math.max(0.1, 1.0 - noiseRate)
+    resultsTry match {
 
-    if (noiseRate > 0.95) {
-      Profiler.recordValue("tautology_detected", 1)
-      debug(s"Tautology Detected: $constraint (Noise Rate: $noiseRate)")
-    } else if (entropyWeight < 0.5) {
-      Profiler.recordValue("low_entropy_penalty", 1)
-    }
-    val stats = HeuristicStats(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist, numSolutions)
-    heuristicMode.toLowerCase match {
-      case "min" => computeHeuristicScoreMinDist(stats) // min distance - optimistic
-      case "max" => computeHeuristicScoreMaxDist(stats) // max distance - pessimistic
-      case "mse" => computeHeuristicScoreMSE(stats) // mean squared error
-      case "var" => computeHeuristicScoreVariance(stats) // distance variance
-      case "avg" => computeHeuristicScoreAverage(stats) // distance average - default
-      case other =>
-        warn(s"Unknown heuristic mode '$other', defaulting to 'avg'.")
-        computeHeuristicScoreAverage(stats)
+      case scala.util.Failure(_: IllegalArgumentException) =>
+        return Int.MaxValue / 2
+      case scala.util.Failure(_: IndexOutOfBoundsException) =>
+        return 500
+      case scala.util.Failure(e) =>
+        return Int.MaxValue / 2
+
+      case scala.util.Success(results) =>
+
+        val satisfactionSignature = results.map(_._1).toVector
+        val semanticHash = MurmurHash3.seqHash(satisfactionSignature)
+
+        if (semanticHistory.contains(semanticHash)) {
+          Profiler.recordValue("semantic_duplicate_detected", 1)
+          return Int.MaxValue / 2
+        } else {
+          semanticHistory.add(semanticHash)
+        }
+
+        val (satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist) =
+          results.fold((0, 0.0, 1.0, 0.0, 0.0)) { (acc, elem) =>
+            (
+              acc._1 + elem._1,
+              acc._2 + elem._2,
+              math.min(acc._3, elem._3),
+              math.max(acc._4, elem._4),
+              acc._5 + elem._5
+            )
+          }
+
+        val noiseSamples = 200
+        val noiseSatisfiedCount = (0 until noiseSamples).count { _ =>
+          val noiseCtx = DataProvider.createRandomContext()
+          try {
+            constraint.eval(noiseCtx).asInstanceOf[Boolean]
+          } catch {
+            case _: IllegalArgumentException => false
+            case _: Exception => false
+          }
+        }
+
+        val noiseRate = noiseSatisfiedCount.toDouble / noiseSamples
+
+        if (noiseRate > 0.95) {
+          Profiler.recordValue("tautology_detected", 1)
+          debug(s"Tautology Detected: $constraint (Noise Rate: $noiseRate)")
+          return Int.MaxValue / 2
+        }
+
+        val stats = HeuristicStats(satisfiedCount, totalNormDist, minNormDist, maxNormDist, sumSqNormDist, numSolutions)
+
+        val rawH = heuristicMode.toLowerCase match {
+          case "min" => computeHeuristicScoreMinDist(stats)
+          case "max" => computeHeuristicScoreMaxDist(stats)
+          case "mse" => computeHeuristicScoreMSE(stats)
+          case "var" => computeHeuristicScoreVariance(stats)
+          case "avg" | _ => computeHeuristicScoreAverage(stats)
+        }
+
+        val loopDiscountH = getWeight("heuristic_loop_discount_h", 1.0)
+
+        if (constraint.isInstanceOf[ForAllExpression[?]]) {
+          (rawH * loopDiscountH).toInt
+        } else {
+          rawH
+        }
     }
   }
 
   private def computeHeuristicScoreAverage(stats: HeuristicStats): Int = {
-    val beta = 2.0
+    val beta = getWeight("heuristic_beta", 2.0)
     val betaSq = beta * beta
-    val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = getWeight("heuristic_scaling", 1000.0).toInt
 
     val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
     val avgNormDist = stats.totalNormalizedDistance / stats.numSolutions.toDouble
@@ -284,9 +366,9 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   }
 
   private def computeHeuristicScoreMinDist(stats: HeuristicStats): Int = {
-    val beta = 2.0
+    val beta = getWeight("heuristic_beta", 2.0)
     val betaSq = beta * beta
-    val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = getWeight("heuristic_scaling", 1000.0).toInt
 
     val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
 
@@ -304,9 +386,9 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   }
 
   private def computeHeuristicScoreMaxDist(stats: HeuristicStats): Int = {
-    val beta = 2.0
+    val beta = getWeight("heuristic_beta", 2.0)
     val betaSq = beta * beta
-    val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = getWeight("heuristic_scaling", 1000.0).toInt
 
     val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
 
@@ -322,9 +404,9 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   }
 
   private def computeHeuristicScoreMSE(stats: HeuristicStats): Int = {
-    val beta = 2.0
+    val beta = getWeight("heuristic_beta", 2.0)
     val betaSq = beta * beta
-    val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = getWeight("heuristic_scaling", 1000.0).toInt
 
     val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
 
@@ -343,9 +425,9 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   }
 
   private def computeHeuristicScoreVariance(stats: HeuristicStats): Int = {
-    val beta = 2.0
+    val beta = getWeight("heuristic_beta", 2.0)
     val betaSq = beta * beta
-    val SCALING_FACTOR = 1000
+    val SCALING_FACTOR = getWeight("heuristic_scaling", 1000.0).toInt
 
     val satisfactionRate = stats.satisfiedCount.toDouble / stats.numSolutions.toDouble
 
@@ -411,13 +493,7 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
           }
 
           debug(s"Generated: $candidateTree to simplified $simplifiedTree")
-          val result = Scanner.visitAll(
-            simplifiedTree,
-            EnsureAnyVarExists(),
-            DenyDivByZero(),
-            MaxDepth(5),
-            DenyDiffnInsideQuantifier() 
-          )
+          val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(), DenyDivByZero(), MaxDepth(9), DenyDiffnInsideQuantifier())
 
           if (result.isAllowed) {
             Profiler.recordValue("accepted", 1)
