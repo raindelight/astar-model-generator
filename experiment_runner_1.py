@@ -10,7 +10,7 @@ RESULTS_DIR = os.path.join(PROJECT_ROOT, "experiment_results")
 USER_HOME = str(Path.home())
 GUROBI_LICENSE = os.path.join(USER_HOME, "development", "gurobi.lic")
 
-ITERATIONS = [100, 1000, 10000]
+ITERATIONS = [1000, 10000]
 HEURISTICS = ["avg", "min", "mse", "var"]
 
 PROBLEMS = {

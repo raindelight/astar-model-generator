@@ -131,3 +131,25 @@ object DepthChecker {
     }
   }
 }
+
+
+case class DenyDiffnInsideQuantifier() extends LocalPolicy {
+
+  override def message: String = "DiffnExpression is not allowed inside a quantifier (forall/exists)"
+
+  override def validate(node: Expression[?]): PolicyResult = node match {
+    case f: ForAllExpression[?] =>
+      if (containsDiffn(f.body)) NonCompliant(node, message) else Compliant
+
+    case e: ExistsExpression[?] =>
+      if (containsDiffn(e.body)) NonCompliant(node, message) else Compliant
+
+    case _ => Compliant
+  }
+
+  private def containsDiffn(expr: Expression[?]): Boolean = expr match {
+    case _: DiffnExpression => true
+    case c: ComposableExpression => c.children.exists(containsDiffn)
+    case _ => false
+  }
+}

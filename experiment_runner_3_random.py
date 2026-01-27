@@ -13,7 +13,7 @@ USER_HOME = str(Path.home())
 GUROBI_LICENSE = os.path.join(USER_HOME, "development", "gurobi.lic")
 
 ITERATIONS = [500]
-HEURISTIC = "avg"
+HEURISTIC = "min"
 SAMPLES_PER_LEVEL = 2
 
 PROBLEMS = {
@@ -26,14 +26,13 @@ PROBLEMS = {
             "models/mznc2024_probs/accap/accap_a20_f160_t90.json",
             "models/mznc2024_probs/accap/accap_a30_f300_t120.json"
         ],
-        "sols": "models/accap_sols_a10.csv"
-    },
-    "Community": {
-        "model": "models/mznc2024_probs/community-detection/community-detection.mzn",
-        "data": [
-            "models/mznc2024_probs/community-detection/Zakhary.s12.k3.dzn"
-        ],
-        "sols": "models/community.s12.k3.csv"
+        "sols": [
+            "models/mznc2024_probs/accap/accap.a3.csv",
+            "models/mznc2024_probs/accap/accap.a8.csv",
+            "models/mznc2024_probs/accap/accap.a10.csv",
+            "models/mznc2024_probs/accap/accap.a20.csv",
+            "models/mznc2024_probs/accap/accap.a30.csv"
+        ]
     }
 }
 
@@ -101,22 +100,30 @@ def run_experiment():
 
                     run_id = f"{prob_name}_Drop{drop_k}_Sample{sample_i}_i{iter_count}"
 
-                    output_csv = os.path.join(RESULTS_DIR, f"{run_id}.csv")
-                    picked_csv = os.path.join(RESULTS_DIR, f"{run_id}_picked.csv")
-                    checkpoint = os.path.join(RESULTS_DIR, f"{run_id}.bin")
+                    run_dir = os.path.join(RESULTS_DIR, run_id)
+                    ensure_dir(run_dir)
+
+                    output_csv = os.path.join(run_dir, "gen_constraints.csv")
+                    picked_csv = os.path.join(run_dir, "picked_constraints.csv")
+                    checkpoint = os.path.join(run_dir, "checkpoint.bin")
 
                     print(f"   [Drop {drop_k}/{total_mutations}] Sample {sample_i+1}: Active={active_count}")
+                    print(f"    -> Output dir: {run_dir}")
 
                     data_files = paths["data"]
                     if isinstance(data_files, str):
                         data_files = [data_files]
+                    data_args_str = " ".join([f'-D "{path}"' for path in data_files])
 
-                    data_args_str = " ".join([f'-d "{path}"' for path in data_files])
+                    sols_files = paths["sols"]
+                    if isinstance(sols_files, str):
+                        sols_files = [sols_files]
+                    sols_args_str = " ".join([f'-s "{path}"' for path in sols_files])
 
                     sbt_args = (
                         f'run {paths["model"]} '
                         f'{data_args_str} '
-                        f'-s {paths["sols"]} '
+                        f'{sols_args_str} '
                         f'-i {iter_count} '
                         f'-e {HEURISTIC} '
                         f'-o "{output_csv}" '
