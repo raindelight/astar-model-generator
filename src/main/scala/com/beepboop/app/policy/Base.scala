@@ -153,3 +153,60 @@ case class DenyDiffnInsideQuantifier() extends LocalPolicy {
     case _ => false
   }
 }
+
+
+case class DenyNestedComprehensions() extends LocalPolicy {
+  override def message: String = "Nested SetComprehensionExpressions are not allowed."
+
+  override def validate(node: Expression[?]): PolicyResult = node match {
+    case parent: SetComprehensionExpression[_] =>
+      if (containsComprehension(parent.head) ||
+        containsComprehension(parent.iteratorDef.collection) ||
+        containsComprehension(parent.filter)) {
+        NonCompliant(node, message)
+      } else {
+        Compliant
+      }
+    case _ => Compliant
+  }
+
+  private def containsComprehension(expr: Expression[?]): Boolean = expr match {
+    case _: SetComprehensionExpression[_] => true
+    case c: ComposableExpression => c.children.exists(containsComprehension)
+    case _ => false
+  }
+}
+
+case class DenyHeavyFilters() extends LocalPolicy {
+
+  private val heavyTypes = Set(
+    classOf[ValuePrecedesChainExpression],
+    classOf[AllDifferentExpression],
+    classOf[AllDifferentExceptZeroExpression],
+    classOf[DiffnExpression],
+    classOf[SymmetryBreakingExpression],
+    classOf[GlobalCardinalityExpression],
+    classOf[CumulativeExpression]
+  )
+
+  override def message: String = "Heavy global constraints are not allowed inside SetComprehension filters."
+
+  override def validate(node: Expression[?]): PolicyResult = node match {
+    case s: SetComprehensionExpression[_] =>
+      if (containsHeavyConstraint(s.filter)) {
+        NonCompliant(node, s"$message Found heavy constraint in filter.")
+      } else {
+        Compliant
+      }
+    case _ => Compliant
+  }
+
+  private def containsHeavyConstraint(expr: Expression[?]): Boolean = {
+    if (heavyTypes.exists(_.isInstance(expr))) return true
+
+    expr match {
+      case c: ComposableExpression => c.children.exists(containsHeavyConstraint)
+      case _ => false
+    }
+  }
+}

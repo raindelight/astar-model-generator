@@ -7,6 +7,105 @@ import com.beepboop.app.components.{ComposableExpression, Constant, Expression, 
 import com.beepboop.app.dataprovider.AStarSnapshot
 import com.beepboop.app.logger.LogTrait
 
+
+object DeepSimilarity {
+
+  private val symmetricOps = Set("+", "*", "=", "!=", "and", "or", "xor", "diffn", "all_different")
+  private val comparisonOps = Set("<", ">", "<=", ">=", "=", "!=")
+  private val arithmeticOps = Set("+", "-", "*", "/", "mod", "dist", "sum", "AddOperator", "SubOperator")
+  private val logicOps = Set("and", "or", "xor", "implies", "equivalent")
+
+  def calculate(a: Expression[_], b: Expression[_], bindings: Map[String, String] = Map.empty): Double = {
+    calculateWithMass(a, b, bindings)._1
+  }
+
+  private def calculateWithMass(
+                                 a: Expression[_],
+                                 b: Expression[_],
+                                 bindings: Map[String, String]
+                               ): (Double, Int) = {
+
+    if (a.getClass != b.getClass) return (0.0, 1)
+
+    (a, b) match {
+      case (v1: Variable[_], v2: Variable[_]) =>
+        val targetName = bindings.getOrElse(v1.name, v1.name)
+        val score = if (targetName == v2.name) 1.0 else 0.0
+        (score, 1)
+
+      case (c1: Constant[_], c2: Constant[_]) =>
+        val score = if (c1.value == c2.value) 1.0 else 0.0
+        (score, 1)
+
+      case (loopA: ForAllExpression[_], loopB: ForAllExpression[_]) =>
+        val (colScore, colMass) = calculateWithMass(loopA.iteratorDef.collection, loopB.iteratorDef.collection, bindings)
+
+
+        val newBindings = bindings + (loopA.iteratorDef.variableName -> loopB.iteratorDef.variableName)
+
+        val (bodyScore, bodyMass) = calculateWithMass(loopA.body, loopB.body, newBindings)
+
+        val totalMass = 1 + colMass + bodyMass
+
+        val totalScore = (1.0 + (colScore * colMass) + (bodyScore * bodyMass)) / totalMass
+
+        (totalScore, totalMass)
+
+      case (comp1: ComposableExpression, comp2: ComposableExpression) =>
+        val op1 = getOperatorName(comp1)
+        val op2 = getOperatorName(comp2)
+
+        var opScore = 0.0
+        if (op1 == op2) opScore = 1.0
+        else if (comparisonOps(op1) && comparisonOps(op2)) opScore = 0.5
+        else if (arithmeticOps(op1) && arithmeticOps(op2)) opScore = 0.5
+        else if (logicOps(op1) && logicOps(op2)) opScore = 0.5
+
+
+        val childrenA = comp1.children
+        val childrenB = comp2.children
+
+        if (childrenA.size != childrenB.size) return (0.0, 1 + childrenA.size)
+
+        val childResults: Seq[(Double, Int)] = if (childrenA.isEmpty) Seq.empty else {
+          if (symmetricOps.contains(op1) || symmetricOps.contains(op2)) {
+            var pool = childrenB
+            childrenA.map { childA =>
+              val bestMatch = pool.map { b =>
+                val res = calculateWithMass(childA, b, bindings)
+                (b, res)
+              }.maxBy(_._2._1)
+
+              pool = pool.filterNot(_ eq bestMatch._1)
+              bestMatch._2
+            }
+          } else {
+            childrenA.zip(childrenB).map {
+              case (cA, cB) => calculateWithMass(cA, cB, bindings)
+            }
+          }
+        }
+
+        val childrenWeightedSum = childResults.map { case (s, m) => s * m }.sum
+        val childrenTotalMass = childResults.map(_._2).sum
+
+        val totalMass = 1 + childrenTotalMass
+
+        val finalScore = (opScore + childrenWeightedSum) / totalMass
+
+        (finalScore, totalMass)
+
+      case _ => (0.0, 1)
+    }
+  }
+
+  private def getOperatorName(expr: ComposableExpression): String = expr match {
+    case c: OperatorContainer => c.operator.toString
+    case _ => expr.getClass.getSimpleName
+  }
+}
+
+
 object SimpleSimilarity {
 
   private val symmetricOps = Set("+", "*", "=", "!=", "and", "or", "xor", "diffn", "all_different")
@@ -113,7 +212,7 @@ class MultiTargetMetricReporter(model: TargetModel) {
 
       val scoreMap = model.targetConstraints.zipWithIndex.map { case (target, idx) =>
         val targetLabel = s"${target.getClass.getSimpleName}_$idx"
-        val score = SimpleSimilarity.calculate(nodeExpr, target)
+        val score = DeepSimilarity.calculate(nodeExpr, target)
         targetLabel -> score
       }.toMap
 
