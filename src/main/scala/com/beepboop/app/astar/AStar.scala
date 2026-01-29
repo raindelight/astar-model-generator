@@ -286,7 +286,9 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
     }
 
     resultsTry match {
-
+      case scala.util.Failure(_: TimeoutException) =>
+        Profiler.recordValue("timeout", 1)
+        return Int.MaxValue /2
       case scala.util.Failure(_: IllegalArgumentException) =>
         return Int.MaxValue / 2
       case scala.util.Failure(_: IndexOutOfBoundsException) =>
@@ -317,7 +319,7 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
             )
           }
 
-        val noiseSamples = 200
+        val noiseSamples = 20
         val noiseSatisfiedCount = (0 until noiseSamples).count { _ =>
           val noiseCtx = DataProvider.createRandomContext()
           try {
