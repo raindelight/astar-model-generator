@@ -1,5 +1,8 @@
 package com.beepboop.app.astar
 
+import scala.concurrent.{Await, Future, TimeoutException}
+import scala.concurrent.duration.*
+import scala.concurrent.ExecutionContext.Implicits.global
 import com.beepboop.app.*
 import com.beepboop.app.components.{BinaryExpression, BoolType, Expression, ForAllExpression}
 import com.beepboop.app.dataprovider.{DataItem, DataProvider}
@@ -17,6 +20,7 @@ import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.AppConfig
 
 import scala.collection.mutable
+import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -246,32 +250,39 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
   private def calculateHeuristic(constraint: Expression[?]): Int = Profiler.profile("calculateHeuristic") {
     if (numSolutions == 0) return Int.MaxValue
 
+    val timeout = 4000.milliseconds
+
 
     val resultsTry = scala.util.Try {
-      (0 until numSolutions).par.map { i =>
-        val context = DataProvider.getSolutionContext(i)
-        val isSatisfied = try {
-          constraint.eval(context).asInstanceOf[Boolean]
-        } catch {
-          case e: IllegalArgumentException =>
-            Profiler.recordValue(s"Discarded due to IllegalArgumentException: $e", 1)
-            throw e
-          case e: ClassCastException =>
-            Profiler.recordValue(s"ClassCastExceptions: $e", 1)
-            false
-          case e: IndexOutOfBoundsException =>
-            false
-          case e: Exception =>
-            Profiler.recordValue(s"UnknownException: $e", 1)
-            false
-        }
+      Await.result(
+        Future {
+          (0 until numSolutions).par.map { i =>
+            val context = DataProvider.getSolutionContext(i)
+            val isSatisfied = try {
+              constraint.eval(context).asInstanceOf[Boolean]
+            } catch {
+              case e: IllegalArgumentException =>
+                Profiler.recordValue(s"Discarded due to IllegalArgumentException: $e", 1)
+                throw e
+              case e: ClassCastException =>
+                Profiler.recordValue(s"ClassCastExceptions: $e", 1)
+                false
+              case e: IndexOutOfBoundsException =>
+                false
+              case e: Exception =>
+                Profiler.recordValue(s"UnknownException: $e", 1)
+                false
+            }
 
-        val rawDist = constraint.distance(context)
-        val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
-        val currentSatisfaction = if (isSatisfied) 1 else 0
+            val rawDist = constraint.distance(context)
+            val normDist = rawDist.toDouble / (1.0 + rawDist.toDouble)
+            val currentSatisfaction = if (isSatisfied) 1 else 0
 
-        (currentSatisfaction, normDist, normDist, normDist, normDist * normDist)
-      }
+            (currentSatisfaction, normDist, normDist, normDist, normDist * normDist)
+          }
+        },
+        timeout
+      )
     }
 
     resultsTry match {
