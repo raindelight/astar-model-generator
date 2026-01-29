@@ -210,3 +210,40 @@ case class DenyHeavyFilters() extends LocalPolicy {
     }
   }
 }
+
+
+
+case class DenyComplexArrayIndices(maxIndexDepth: Int = 3) extends LocalPolicy {
+
+  override def message: String = "Array indices must be simple (no comprehensions/globals, limited depth)."
+
+  override def validate(node: Expression[?]): PolicyResult = node match {
+    case ae: ArrayElement[_] =>
+
+      if (containsForbiddenTypes(ae.index)) {
+        NonCompliant(node, s"$message Index contains forbidden complex types (SetComp, Sum, etc.).")
+      }
+      else if (ae.index.depth > maxIndexDepth) {
+        NonCompliant(node, s"$message Index depth ${ae.index.depth} exceeds limit $maxIndexDepth.")
+      }
+      else {
+        Compliant
+      }
+
+    case _ => Compliant
+  }
+
+  private def containsForbiddenTypes(expr: Expression[?]): Boolean = expr match {
+    case _: SetComprehensionExpression[_] => true
+    case _: SumExpression[_]              => true
+    case _: CountExpression               => true
+    case _: ForAllExpression[_]           => true
+    case _: ExistsExpression[_]           => true
+    case _: GlobalCardinalityExpression   => true
+    case _: CumulativeExpression          => true
+    case _: DiffnExpression               => true
+
+    case c: ComposableExpression => c.children.exists(containsForbiddenTypes)
+    case _ => false
+  }
+}

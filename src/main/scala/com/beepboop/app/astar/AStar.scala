@@ -15,7 +15,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import scala.collection.parallel.CollectionConverters.RangeIsParallelizable
 import com.beepboop.app.dataprovider.{AStarSnapshot, PersistenceManager}
-import com.beepboop.app.policy.{Compliant, DenyDiffnInsideQuantifier, DenyDivByZero, DenyHeavyFilters, DenyNestedComprehensions, EnsureAnyVarExists, MaxDepth, NonCompliant, Scanner}
+import com.beepboop.app.policy.{Compliant, DenyComplexArrayIndices, DenyDiffnInsideQuantifier, DenyDivByZero, DenyHeavyFilters, DenyNestedComprehensions, EnsureAnyVarExists, MaxDepth, NonCompliant, Scanner}
 import com.beepboop.app.postprocessor.Postprocessor
 import com.beepboop.app.utils.AppConfig
 
@@ -509,7 +509,7 @@ class AStar(grammar: ParsedGrammar, heuristicMode: String = "avg") extends LogTr
           val result = Scanner.visitAll(simplifiedTree, EnsureAnyVarExists(),
             DenyDivByZero(), MaxDepth(9), DenyDiffnInsideQuantifier(),
             DenyNestedComprehensions(),
-            DenyHeavyFilters()
+            DenyHeavyFilters(), DenyComplexArrayIndices(maxIndexDepth = 3)
           )
 
           if (result.isAllowed) {
